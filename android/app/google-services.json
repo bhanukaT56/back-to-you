@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "162389671929",
+    "project_id": "back-to-you-584e7",
+    "storage_bucket": "back-to-you-584e7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:162389671929:android:a84b2ea05a9b36b72e0728",
+        "android_client_info": {
+          "package_name": "com.example.back_to_you"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD83imd0hTwYnpqAQJGQAY6AbPyLy8n9kk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
