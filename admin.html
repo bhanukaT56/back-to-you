@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Back To You — Admin Panel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f0f0f;
+      color: #fff;
+      font-family: sans-serif;
+      padding: 24px;
+    }
+    h1 {
+      color: #22d3ee;
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      color: #555;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .user-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .user-card img {
+      width: 160px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #2a2a2a;
+      flex-shrink: 0;
+    }
+    .user-info { flex: 1; }
+    .user-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .user-detail {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+    .badge-pending {
+      background: #2a1a00;
+      color: #f59e0b;
+    }
+    .badge-verified {
+      background: #052e16;
+      color: #4ade80;
+    }
+    .btn-verify {
+      margin-top: 12px;
+      padding: 10px 24px;
+      background: #22d3ee;
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn-verify:hover { background: #06b6d4; }
+    .btn-verify:disabled {
+      background: #1a1a1a;
+      color: #555;
+      border: 1px solid #2a2a2a;
+      cursor: not-allowed;
+    }
+    .loading {
+      text-align: center;
+      color: #555;
+      padding: 48px;
+      font-size: 16px;
+    }
+    .empty {
+      text-align: center;
+      color: #555;
+      padding: 48px;
+      font-size: 16px;
+    }
+    .error {
+      text-align: center;
+      color: #f87171;
+      padding: 48px;
+      font-size: 14px;
+    }
+    .refresh-btn {
+      padding: 10px 24px;
+      background: #1a1a1a;
+      color: #22d3ee;
+      border: 1px solid #22d3ee;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+    .refresh-btn:hover { background: #083344; }
+  </style>
+</head>
+<body>
+
+  <h1>🔍 Back To You</h1>
+  <p class="subtitle">admin panel — verify student IDs</p>
+
+  <button class="refresh-btn" onclick="loadUsers()">refresh</button>
+
+  <div id="users-container">
+    <div class="loading">loading users...</div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // your firebase config — copy from firebase_options.dart
+    const firebaseConfig = {
+      apiKey: 'AIzaSyD83imd0hTwYnpqAQJGQAY6AbPyLy8n9kk',
+      authDomain: 'back-to-you-584e7.firebaseapp.com',
+      projectId: 'back-to-you-584e7',
+      storageBucket: 'back-to-you-584e7.firebasestorage.app',
+      messagingSenderId: '162389671929',
+      appId: '1:162389671929:android:a84b2ea05a9b36b72e0728',
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.loadUsers = async function() {
+      const container = document.getElementById('users-container');
+      container.innerHTML = '<div class="loading">loading users...</div>';
+
+      try {
+        const querySnapshot = await getDocs(collection(db, 'users'));
+
+        if (querySnapshot.empty) {
+          container.innerHTML = '<div class="empty">no users registered yet</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+
+        querySnapshot.forEach((docSnap) => {
+          const user = docSnap.data();
+          const uid = docSnap.id;
+
+          const card = document.createElement('div');
+          card.className = 'user-card';
+          card.id = `card-${uid}`;
+
+          const isVerified = user.isVerified === true;
+
+          card.innerHTML = `
+            <img 
+              src="data:image/jpeg;base64,${user.idPhotoBase64}" 
+              alt="Student ID"
+            />
+            <div class="user-info">
+              <div class="user-name">${user.name || 'Unknown'}</div>
+              <div class="user-detail">email: ${user.email || '-'}</div>
+              <div class="user-detail">student ID: ${user.studentId || '-'}</div>
+              <div class="user-detail">registered: ${user.createdAt ? new Date(user.createdAt.seconds * 1000).toLocaleString() : '-'}</div>
+              <div>
+                <span class="badge ${isVerified ? 'badge-verified' : 'badge-pending'}">
+                  ${isVerified ? '✓ verified' : '⏳ pending'}
+                </span>
+              </div>
+              <button 
+                class="btn-verify" 
+                id="btn-${uid}"
+                ${isVerified ? 'disabled' : ''}
+                onclick="verifyUser('${uid}')"
+              >
+                ${isVerified ? 'already verified' : 'verify this student'}
+              </button>
+            </div>
+          `;
+
+          container.appendChild(card);
+        });
+
+      } catch (error) {
+        container.innerHTML = `<div class="error">error loading users: ${error.message}</div>`;
+      }
+    };
+
+    window.verifyUser = async function(uid) {
+      const btn = document.getElementById(`btn-${uid}`);
+      btn.textContent = 'verifying...';
+      btn.disabled = true;
+
+      try {
+        await updateDoc(doc(db, 'users', uid), {
+          isVerified: true
+        });
+
+        btn.textContent = 'verified!';
+        btn.style.background = '#052e16';
+        btn.style.color = '#4ade80';
+
+        // update badge
+        const card = document.getElementById(`card-${uid}`);
+        const badge = card.querySelector('.badge');
+        badge.className = 'badge badge-verified';
+        badge.textContent = '✓ verified';
+
+      } catch (error) {
+        btn.textContent = 'failed — try again';
+        btn.disabled = false;
+        alert('error: ' + error.message);
+      }
+    };
+
+    // load on page open
+    loadUsers();
+  </script>
+
+</body>
+</html>
