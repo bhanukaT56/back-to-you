@@ -6,6 +6,10 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/feed_screen.dart';
+import 'screens/post_screen.dart';
+import 'screens/map_screen.dart';
+import 'screens/item_detail_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +41,10 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const RegisterScreen(),
         '/pending': (context) => const PendingScreen(),
         '/feed': (context) => const FeedScreen(),
+        '/post': (context) => const PostScreen(),
+        '/map': (context) => const MapScreen(),
+        '/item-detail': (context) => const ItemDetailScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }

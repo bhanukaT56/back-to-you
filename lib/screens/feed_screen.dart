@@ -1,20 +1,441 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import '../models/item_model.dart';
+import '../services/firestore_service.dart';
+import '../services/auth_service.dart';
 
-class FeedScreen extends StatelessWidget {
+class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
+
+  @override
+  State<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends State<FeedScreen> {
+  String _filter = 'all';
+  int _currentIndex = 0;
+  String _userName = '';
+  final FirestoreService _firestoreService = FirestoreService();
+  final AuthService _authService = AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final data = await _authService.getUserData();
+    if (data != null && mounted) {
+      setState(() {
+        _userName = data['name']?.split(' ')?.first ?? 'there';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
-      body: Center(
-        child: Text(
-          'Feed Screen - Coming Soon',
-          style: TextStyle(
-            color: Color(0xFF22D3EE),
-            fontSize: 18,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildFilterTabs(),
+            Expanded(
+              child: _buildFeed(),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.pushNamed(context, '/post');
+              },
+              backgroundColor: const Color(0xFF22D3EE),
+              foregroundColor: Colors.black,
+              icon: const Icon(Icons.add),
+              label: const Text(
+                'make a post',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      color: const Color(0xFF0D1F26),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'hey $_userName 👋',
+                style: const TextStyle(
+                  color: Color(0xFF0891B2),
+                  fontSize: 13,
+                ),
+              ),
+              const Text(
+                'feed',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          GestureDetector(
+            onTap: () {
+              Navigator.pushNamed(context, '/profile');
+            },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF083344),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF22D3EE),
+                  width: 1.5,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: Color(0xFF22D3EE),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterTabs() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      color: const Color(0xFF0F0F0F),
+      child: Row(
+        children: [
+          _filterTab('all', 'all'),
+          const SizedBox(width: 8),
+          _filterTab('found', 'found'),
+          const SizedBox(width: 8),
+          _filterTab('lost', 'lost'),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterTab(String value, String label) {
+    bool isSelected = _filter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _filter = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF22D3EE) : const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF22D3EE)
+                : const Color(0xFF2A2A2A),
           ),
         ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : const Color(0xFF555555),
+            fontWeight: FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeed() {
+    return StreamBuilder<List<ItemModel>>(
+      stream: _firestoreService.getItems(filter: _filter),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF22D3EE)),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'something went wrong',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          );
+        }
+
+        final items = snapshot.data ?? [];
+
+        if (items.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('🔍', style: TextStyle(fontSize: 48)),
+                const SizedBox(height: 16),
+                const Text(
+                  'nothing here yet',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'be the first to make a post!',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            return _buildItemCard(items[index]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildItemCard(ItemModel item) {
+    bool isFound = item.type == 'found';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          '/item-detail',
+          arguments: item,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // card header - user info
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isFound
+                          ? const Color(0xFF052E16)
+                          : const Color(0xFF450A0A),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        item.postedByName.isNotEmpty
+                            ? item.postedByName[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          color: isFound
+                              ? const Color(0xFF4ADE80)
+                              : const Color(0xFFF87171),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${item.postedByName} posted',
+                    style: const TextStyle(
+                      color: Color(0xFFAAAAAA),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    item.timeAgo,
+                    style: const TextStyle(
+                      color: Color(0xFF444444),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // item image
+            if (item.imageBase64.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.zero,
+                child: Image.memory(
+                  base64Decode(item.imageBase64),
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                height: 180,
+                color: const Color(0xFF0D1F26),
+                child: const Center(
+                  child: Text('📦', style: TextStyle(fontSize: 48)),
+                ),
+              ),
+
+            // item details
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.description,
+                    style: const TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isFound
+                              ? const Color(0xFF052E16)
+                              : const Color(0xFF450A0A),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          isFound ? 'found' : 'lost',
+                          style: TextStyle(
+                            color: isFound
+                                ? const Color(0xFF4ADE80)
+                                : const Color(0xFFF87171),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.location_on_outlined,
+                        color: Color(0xFF444444),
+                        size: 13,
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          item.location,
+                          style: const TextStyle(
+                            color: Color(0xFF444444),
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F0F0F),
+        border: Border(
+          top: BorderSide(color: Color(0xFF1F1F1F)),
+        ),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() => _currentIndex = index);
+          if (index == 1) Navigator.pushNamed(context, '/map');
+          if (index == 2) Navigator.pushNamed(context, '/post');
+          if (index == 3) Navigator.pushNamed(context, '/profile');
+        },
+        backgroundColor: const Color(0xFF0F0F0F),
+        selectedItemColor: const Color(0xFF22D3EE),
+        unselectedItemColor: const Color(0xFF444444),
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'feed',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
+            label: 'map',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add_circle_outline),
+            activeIcon: Icon(Icons.add_circle),
+            label: 'post',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'me',
+          ),
+        ],
       ),
     );
   }
