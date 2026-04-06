@@ -5,12 +5,12 @@ class ItemModel {
   final String title;
   final String description;
   final String category;
-  final String type; // "found" or "lost"
-  final String status; // "found", "submitted", "claimed"
+  final String type;
+  final String status;
   final String location;
   final double latitude;
   final double longitude;
-  final String imageBase64;
+  final String imageUrl;
   final String postedBy;
   final String postedByName;
   final DateTime createdAt;
@@ -25,14 +25,12 @@ class ItemModel {
     required this.location,
     required this.latitude,
     required this.longitude,
-    required this.imageBase64,
+    required this.imageUrl,
     required this.postedBy,
     required this.postedByName,
     required this.createdAt,
   });
 
-  // convert Firestore document to ItemModel
-  // like parsing JSON in React
   factory ItemModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return ItemModel(
@@ -45,14 +43,13 @@ class ItemModel {
       location: data['location'] ?? '',
       latitude: (data['latitude'] ?? 0.0).toDouble(),
       longitude: (data['longitude'] ?? 0.0).toDouble(),
-      imageBase64: data['imageBase64'] ?? '',
+      imageUrl: data['imageUrl'] ?? '',
       postedBy: data['postedBy'] ?? '',
       postedByName: data['postedByName'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
-  // convert ItemModel to Map for saving to Firestore
   Map<String, dynamic> toMap() {
     return {
       'title': title,
@@ -63,18 +60,16 @@ class ItemModel {
       'location': location,
       'latitude': latitude,
       'longitude': longitude,
-      'imageBase64': imageBase64,
+      'imageUrl': imageUrl,
       'postedBy': postedBy,
       'postedByName': postedByName,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
 
-  // time ago helper — like "2h ago", "just now"
   String get timeAgo {
     final now = DateTime.now();
     final difference = now.difference(createdAt);
-
     if (difference.inSeconds < 60) return 'just now';
     if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
     if (difference.inHours < 24) return '${difference.inHours}h ago';

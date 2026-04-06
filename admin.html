@@ -171,10 +171,11 @@
           const isVerified = user.isVerified === true;
 
           card.innerHTML = `
-            <img 
-              src="data:image/jpeg;base64,${user.idPhotoBase64}" 
-              alt="Student ID"
-            />
+           <img 
+  src="${user.idPhotoUrl || ''}" 
+  alt="Student ID"
+  onerror="this.style.display='none'"
+/>
             <div class="user-info">
               <div class="user-name">${user.name || 'Unknown'}</div>
               <div class="user-detail">email: ${user.email || '-'}</div>

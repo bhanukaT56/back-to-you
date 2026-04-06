@@ -39,18 +39,30 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     onPressed: () => Navigator.pop(context),
   ),
   flexibleSpace: FlexibleSpaceBar(
-    background: item.imageBase64.isNotEmpty
-        ? Image.memory(
-            base64Decode(item.imageBase64),
-            fit: BoxFit.cover,
-          )
-        : Container(
-            color: const Color(0xFF0D1F26),
-            child: const Center(
-              child: Text('📦', style: TextStyle(fontSize: 64)),
-            ),
+  background: item.imageUrl.isNotEmpty
+      ? Image.network(
+          item.imageUrl,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              color: const Color(0xFF0D1F26),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF22D3EE),
+                  strokeWidth: 2,
+                ),
+              ),
+            );
+          },
+        )
+      : Container(
+          color: const Color(0xFF0D1F26),
+          child: const Center(
+            child: Text('📦', style: TextStyle(fontSize: 64)),
           ),
-  ),
+        ),
+),
 ),
 
           SliverToBoxAdapter(

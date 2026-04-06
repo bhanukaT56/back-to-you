@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../models/item_model.dart';
@@ -17,6 +14,16 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+
+void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF1A1A1A),
+      ),
+    );
+  }
+
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _picker = ImagePicker();
@@ -155,52 +162,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       setState(() => _isUploadingPhoto = true);
 
-      final compressedBytes = await FlutterImageCompress.compressWithFile(
-        photo.path,
-        quality: 40,
-        minWidth: 200,
-        minHeight: 200,
-      );
+      String? error = await _authService.updateProfilePhoto(File(photo.path));
 
-      if (compressedBytes == null) {
-        setState(() => _isUploadingPhoto = false);
-        return;
-      }
-
-      String base64Photo = base64Encode(compressedBytes);
-
-      // save to Firestore
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({'profilePhotoBase64': base64Photo});
-
-        // reload user data
+      if (error != null) {
+        _showSnackBar(error);
+      } else {
         await _loadUserData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('profile photo updated!'),
+              backgroundColor: Color(0xFF052E16),
+            ),
+          );
+        }
       }
 
       setState(() => _isUploadingPhoto = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('profile photo updated!'),
-            backgroundColor: Color(0xFF052E16),
-          ),
-        );
-      }
     } catch (e) {
       setState(() => _isUploadingPhoto = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('could not update photo'),
-            backgroundColor: Color(0xFF1A1A1A),
-          ),
-        );
-      }
+      _showSnackBar('could not update photo');
     }
   }
 
@@ -252,7 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String studentId = _userData?['studentId'] ?? '-';
     String email = _userData?['email'] ?? '-';
     bool isVerified = _userData?['isVerified'] ?? false;
-    String? profilePhotoBase64 = _userData?['profilePhotoBase64'];
+    String? profilePhotoUrl = _userData?['profilePhotoUrl'];
     String initials = name.isNotEmpty
         ? name.split(' ').map((e) => e[0]).take(2).join().toUpperCase()
         : '?';
@@ -279,20 +260,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   child: _isUploadingPhoto
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF22D3EE),
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : profilePhotoBase64 != null
-                          ? ClipOval(
-                              child: Image.memory(
-                                base64Decode(profilePhotoBase64),
-                                fit: BoxFit.cover,
-                                width: 90,
-                                height: 90,
-                              ),
+    ? const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF22D3EE),
+          strokeWidth: 2,
+        ),
+      )
+    : profilePhotoUrl != null
+        ? ClipOval(
+            child: Image.network(
+              profilePhotoUrl,
+              fit: BoxFit.cover,
+              width: 90,
+              height: 90,
+            ),
                             )
                           : Center(
                               child: Text(
@@ -416,31 +397,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 20),
 
           // student ID photo — 1.59:1 ratio
-          if (_userData?['idPhotoBase64'] != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'student ID card',
-                  style: TextStyle(
-                    color: Color(0xFFAAAAAA),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+         if (_userData?['idPhotoUrl'] != null)
+  Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'student ID card',
+        style: TextStyle(
+          color: Color(0xFFAAAAAA),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      const SizedBox(height: 8),
+      AspectRatio(
+        aspectRatio: 1.59,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(
+            _userData!['idPhotoUrl'],
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return Container(
+                color: const Color(0xFF1A1A1A),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF22D3EE),
+                    strokeWidth: 2,
                   ),
                 ),
-                const SizedBox(height: 8),
-                AspectRatio(
-                  aspectRatio: 1.59,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.memory(
-                      base64Decode(_userData!['idPhotoBase64']),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
+          ),
+        ),
+      ),
+    ],
+  ),
         ],
       ),
     );
@@ -603,13 +596,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // image — square
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: item.imageBase64.isNotEmpty
-                  ? Image.memory(
-                      base64Decode(item.imageBase64),
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                    )
+             child: item.imageUrl.isNotEmpty
+    ? Image.network(
+        item.imageUrl,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+      )
                   : Container(
                       width: 60,
                       height: 60,

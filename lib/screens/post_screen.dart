@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:convert';
+
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
@@ -650,7 +650,7 @@ class _PostScreenState extends State<PostScreen> {
     );
   }
 
-  Future<void> _handlePost() async {
+ Future<void> _handlePost() async {
     if (_titleController.text.isEmpty) {
       _showSnackBar('please enter item name');
       return;
@@ -680,22 +680,6 @@ class _PostScreenState extends State<PostScreen> {
         return;
       }
 
-      // compress image before saving
-      final compressedBytes = await FlutterImageCompress.compressWithFile(
-        _itemImage!.path,
-        quality: 30,
-        minWidth: 600,
-        minHeight: 600,
-      );
-
-      if (compressedBytes == null) {
-        _showSnackBar('could not process image');
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      String base64Image = base64Encode(compressedBytes);
-
       final item = ItemModel(
         id: '',
         title: _titleController.text.trim(),
@@ -706,13 +690,14 @@ class _PostScreenState extends State<PostScreen> {
         location: _location,
         latitude: _latitude,
         longitude: _longitude,
-        imageBase64: base64Image,
+        imageUrl: '',
         postedBy: user.uid,
         postedByName: userData['name'] ?? 'Anonymous',
         createdAt: DateTime.now(),
       );
 
-      String? error = await _firestoreService.addItem(item);
+      // pass the actual image file to addItem
+      String? error = await _firestoreService.addItem(item, _itemImage!);
 
       setState(() => _isLoading = false);
 

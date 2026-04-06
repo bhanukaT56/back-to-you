@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
@@ -25,12 +25,12 @@ class _FeedScreenState extends State<FeedScreen> {
     _loadUserData();
   }
 
-  Future<void> _loadUserData() async {
+ Future<void> _loadUserData() async {
     final data = await _authService.getUserData();
     if (data != null && mounted) {
       setState(() {
         _userName = data['name']?.split(' ')?.first ?? 'there';
-        _profilePhoto = data['profilePhotoBase64'];
+        _profilePhoto = data['profilePhotoUrl'];
       });
     }
   }
@@ -111,14 +111,14 @@ class _FeedScreenState extends State<FeedScreen> {
                   width: 1.5,
                 ),
               ),
-              child: _profilePhoto != null
-                  ? ClipOval(
-                      child: Image.memory(
-                        base64Decode(_profilePhoto!),
-                        fit: BoxFit.cover,
-                        width: 44,
-                        height: 44,
-                      ),
+             child: _profilePhoto != null
+    ? ClipOval(
+        child: Image.network(
+          _profilePhoto!,
+          fit: BoxFit.cover,
+          width: 44,
+          height: 44,
+        ),
                     )
                   : Center(
                       child: Text(
@@ -315,29 +315,40 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
 
-            if (item.imageBase64.isNotEmpty)
-              AspectRatio(
-                aspectRatio: 1.0,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.zero,
-                  child: Image.memory(
-                    base64Decode(item.imageBase64),
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              )
-            else
-              AspectRatio(
-                aspectRatio: 1.0,
-                child: Container(
-                  width: double.infinity,
-                  color: const Color(0xFF0D1F26),
-                  child: const Center(
-                    child: Text('📦', style: TextStyle(fontSize: 48)),
-                  ),
-                ),
+         if (item.imageUrl.isNotEmpty)
+  AspectRatio(
+    aspectRatio: 1.0,
+    child: ClipRRect(
+      borderRadius: BorderRadius.zero,
+      child: Image.network(
+        item.imageUrl,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: const Color(0xFF0D1F26),
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF22D3EE),
+                strokeWidth: 2,
               ),
+            ),
+          );
+        },
+      ),
+    ),
+  )
+else
+  AspectRatio(
+    aspectRatio: 1.0,
+    child: Container(
+      color: const Color(0xFF0D1F26),
+      child: const Center(
+        child: Text('📦', style: TextStyle(fontSize: 48)),
+      ),
+    ),
+  ),
 
             Padding(
               padding: const EdgeInsets.all(12),

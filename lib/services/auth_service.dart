@@ -1,16 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
-import 'dart:convert';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // get current logged in user
   User? get currentUser => _auth.currentUser;
-
-  // listen to auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // REGISTER
@@ -22,7 +20,7 @@ class AuthService {
     required File studentIdImage,
   }) async {
     try {
-      // step 1 — create account in Firebase Auth
+      // step 1 — create account
       UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -31,21 +29,23 @@ class AuthService {
 
       String uid = userCredential.user!.uid;
 
-      // step 2 — convert image to base64 string
-      List<int> imageBytes = await studentIdImage.readAsBytes();
-      String base64Image = base64Encode(imageBytes);
+      // step 2 — upload student ID to Firebase Storage
+      String fileName = 'student_ids/$uid/student_id.jpg';
+      Reference storageRef = _storage.ref().child(fileName);
+      await storageRef.putFile(studentIdImage);
+      String idPhotoUrl = await storageRef.getDownloadURL();
 
       // step 3 — save user data to Firestore
       await _firestore.collection('users').doc(uid).set({
         'name': name,
         'email': email,
         'studentId': studentId,
-        'idPhotoBase64': base64Image,
+        'idPhotoUrl': idPhotoUrl,
         'isVerified': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      return null; // null means success!
+      return null;
 
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
@@ -59,12 +59,13 @@ class AuthService {
           return 'registration failed. please try again';
       }
     } catch (e) {
+      print('🔴 register error: $e');
       return 'something went wrong. please try again';
     }
   }
 
   // LOGIN
- Future<String?> login({
+  Future<String?> login({
     required String email,
     required String password,
   }) async {
@@ -74,11 +75,7 @@ class AuthService {
         password: password,
       );
       return null;
-
     } on FirebaseAuthException catch (e) {
-      print('🔴 Firebase error code: ${e.code}');
-      print('🔴 Firebase error message: ${e.message}');
-      
       switch (e.code) {
         case 'user-not-found':
           return 'no account found with this email';
@@ -86,18 +83,16 @@ class AuthService {
           return 'incorrect email or password';
         case 'invalid-credential':
           return 'incorrect email or password';
-        case 'invalid-email':
-          return 'please enter a valid email';
         case 'user-disabled':
           return 'this account has been disabled';
         default:
-          return 'error: ${e.code}';
+          return 'login failed. please try again';
       }
     } catch (e) {
-      print('🔴 General error: $e');
-      return e.toString();
+      return 'something went wrong. please try again';
     }
   }
+
   // LOGOUT
   Future<void> logout() async {
     await _auth.signOut();
@@ -136,6 +131,30 @@ class AuthService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  // UPDATE PROFILE PHOTO
+  Future<String?> updateProfilePhoto(File photo) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user == null) return 'not logged in';
+
+      // upload to Storage
+      String fileName = 'profile_photos/${user.uid}/profile.jpg';
+      Reference storageRef = _storage.ref().child(fileName);
+      await storageRef.putFile(photo);
+      String photoUrl = await storageRef.getDownloadURL();
+
+      // save url to Firestore
+      await _firestore.collection('users').doc(user.uid).update({
+        'profilePhotoUrl': photoUrl,
+      });
+
+      return null;
+    } catch (e) {
+      print('🔴 profile photo error: $e');
+      return 'could not update photo';
     }
   }
 }
