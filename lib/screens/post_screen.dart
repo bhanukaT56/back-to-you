@@ -79,14 +79,14 @@ class _PostScreenState extends State<PostScreen> {
         return;
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.low,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('location timed out');
-        },
-      );
+   Position position = await Geolocator.getCurrentPosition(
+  desiredAccuracy: LocationAccuracy.best,
+).timeout(
+  const Duration(seconds: 15),
+  onTimeout: () {
+    throw Exception('location timed out');
+  },
+);
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
