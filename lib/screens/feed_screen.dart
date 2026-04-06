@@ -15,20 +15,22 @@ class _FeedScreenState extends State<FeedScreen> {
   String _filter = 'all';
   int _currentIndex = 0;
   String _userName = '';
+  String? _profilePhoto;
   final FirestoreService _firestoreService = FirestoreService();
   final AuthService _authService = AuthService();
 
   @override
   void initState() {
     super.initState();
-    _loadUserName();
+    _loadUserData();
   }
 
-  Future<void> _loadUserName() async {
+  Future<void> _loadUserData() async {
     final data = await _authService.getUserData();
     if (data != null && mounted) {
       setState(() {
         _userName = data['name']?.split(' ')?.first ?? 'there';
+        _profilePhoto = data['profilePhotoBase64'];
       });
     }
   }
@@ -94,12 +96,13 @@ class _FeedScreenState extends State<FeedScreen> {
             ],
           ),
           GestureDetector(
-            onTap: () {
-              Navigator.pushNamed(context, '/profile');
+            onTap: () async {
+              await Navigator.pushNamed(context, '/profile');
+              _loadUserData();
             },
             child: Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: const Color(0xFF083344),
                 shape: BoxShape.circle,
@@ -108,16 +111,27 @@ class _FeedScreenState extends State<FeedScreen> {
                   width: 1.5,
                 ),
               ),
-              child: Center(
-                child: Text(
-                  _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: Color(0xFF22D3EE),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+              child: _profilePhoto != null
+                  ? ClipOval(
+                      child: Image.memory(
+                        base64Decode(_profilePhoto!),
+                        fit: BoxFit.cover,
+                        width: 44,
+                        height: 44,
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        _userName.isNotEmpty
+                            ? _userName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          color: Color(0xFF22D3EE),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
             ),
           ),
         ],
@@ -148,7 +162,9 @@ class _FeedScreenState extends State<FeedScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF22D3EE) : const Color(0xFF1A1A1A),
+          color: isSelected
+              ? const Color(0xFF22D3EE)
+              : const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
@@ -170,7 +186,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Widget _buildFeed() {
     return StreamBuilder<List<ItemModel>>(
-      stream: _firestoreService.getItems(filter: _filter),
+      stream: _firestoreService.getItems(filter: 'all'),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -187,7 +203,12 @@ class _FeedScreenState extends State<FeedScreen> {
           );
         }
 
-        final items = snapshot.data ?? [];
+        final allItems = snapshot.data ?? [];
+
+        // filter locally instead of re-querying Firestore
+        final items = _filter == 'all'
+            ? allItems
+            : allItems.where((i) => i.type == _filter).toList();
 
         if (items.isEmpty) {
           return Center(
@@ -246,7 +267,6 @@ class _FeedScreenState extends State<FeedScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // card header - user info
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: Row(
@@ -295,28 +315,30 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
 
-            // item image
             if (item.imageBase64.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.zero,
-                child: Image.memory(
-                  base64Decode(item.imageBase64),
-                  width: double.infinity,
-                  height: 180,
-                  fit: BoxFit.cover,
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.zero,
+                  child: Image.memory(
+                    base64Decode(item.imageBase64),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               )
             else
-              Container(
-                width: double.infinity,
-                height: 180,
-                color: const Color(0xFF0D1F26),
-                child: const Center(
-                  child: Text('📦', style: TextStyle(fontSize: 48)),
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: Container(
+                  width: double.infinity,
+                  color: const Color(0xFF0D1F26),
+                  child: const Center(
+                    child: Text('📦', style: TextStyle(fontSize: 48)),
+                  ),
                 ),
               ),
 
-            // item details
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(

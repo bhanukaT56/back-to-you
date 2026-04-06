@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../services/auth_service.dart';
+import '../services/image_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -20,7 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   File? _studentIdImage;
-  final ImagePicker _picker = ImagePicker();
+  final ImageService _imageService = ImageService();
 
   @override
   void dispose() {
@@ -76,13 +77,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      final XFile? photo = await _picker.pickImage(
-                        source: ImageSource.camera,
-                        imageQuality: 80,
+                      final File? image = await _imageService.pickStudentId(
+                        ImageSource.camera,
                       );
-                      if (photo != null) {
+                      if (image != null) {
                         setState(() {
-                          _studentIdImage = File(photo.path);
+                          _studentIdImage = image;
                         });
                       }
                     },
@@ -120,13 +120,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      final XFile? photo = await _picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 80,
+                      final File? image = await _imageService.pickStudentId(
+                        ImageSource.gallery,
                       );
-                      if (photo != null) {
+                      if (image != null) {
                         setState(() {
-                          _studentIdImage = File(photo.path);
+                          _studentIdImage = image;
                         });
                       }
                     },
@@ -208,6 +207,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+
+              // student id upload
               const Text(
                 'student ID card photo',
                 style: TextStyle(
@@ -217,58 +218,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _pickStudentId,
-                child: Container(
-                  width: double.infinity,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _studentIdImage != null
-                          ? const Color(0xFF22D3EE)
-                          : const Color(0xFF2A2A2A),
-                      width: _studentIdImage != null ? 1.5 : 1,
+
+              // 1.59:1 ratio container
+              AspectRatio(
+                aspectRatio: 1.59,
+                child: GestureDetector(
+                  onTap: _pickStudentId,
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _studentIdImage != null
+                            ? const Color(0xFF22D3EE)
+                            : const Color(0xFF2A2A2A),
+                        width: _studentIdImage != null ? 1.5 : 1,
+                      ),
                     ),
-                  ),
-                  child: _studentIdImage != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _studentIdImage!,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.credit_card,
-                              color: Color(0xFF22D3EE),
-                              size: 40,
+                    child: _studentIdImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              _studentIdImage!,
+                              fit: BoxFit.cover,
                             ),
-                            SizedBox(height: 8),
-                            Text(
-                              'tap to upload student ID',
-                              style: TextStyle(
+                          )
+                        : const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.credit_card,
                                 color: Color(0xFF22D3EE),
-                                fontWeight: FontWeight.w500,
+                                size: 40,
                               ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'take a photo or choose from gallery',
-                              style: TextStyle(
-                                color: Color(0xFF555555),
-                                fontSize: 12,
+                              SizedBox(height: 8),
+                              Text(
+                                'tap to upload student ID',
+                                style: TextStyle(
+                                  color: Color(0xFF22D3EE),
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                              SizedBox(height: 4),
+                              Text(
+                                'take a photo or choose from gallery',
+                                style: TextStyle(
+                                  color: Color(0xFF555555),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
               ),
+
               const SizedBox(height: 24),
+
               _buildLabel('full name'),
               const SizedBox(height: 8),
               _buildTextField(
@@ -277,6 +284,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.name,
               ),
               const SizedBox(height: 16),
+
               _buildLabel('student ID number'),
               const SizedBox(height: 8),
               _buildTextField(
@@ -285,6 +293,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
+
               _buildLabel('student email'),
               const SizedBox(height: 8),
               _buildTextField(
@@ -293,6 +302,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
+
               _buildLabel('password'),
               const SizedBox(height: 8),
               TextField(
@@ -313,6 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
               _buildLabel('confirm password'),
               const SizedBox(height: 8),
               TextField(
@@ -333,6 +344,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -357,6 +369,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

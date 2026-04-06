@@ -5,10 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+import '../services/image_service.dart';
 
 class PostScreen extends StatefulWidget {
   const PostScreen({super.key});
@@ -22,9 +23,9 @@ class _PostScreenState extends State<PostScreen> {
   final _descriptionController = TextEditingController();
   final FirestoreService _firestoreService = FirestoreService();
   final AuthService _authService = AuthService();
-  final ImagePicker _picker = ImagePicker();
+  final ImageService _imageService = ImageService();
 
-  String _type = 'found'; // "found" or "lost"
+  String _type = 'found';
   String _category = 'Electronics';
   String _location = '';
   double _latitude = 0.0;
@@ -51,15 +52,11 @@ class _PostScreenState extends State<PostScreen> {
     super.dispose();
   }
 
-  // GPS SENSOR — get current location
- Future<void> _getCurrentLocation() async {
-    print('🔍 getting location...');
+  Future<void> _getCurrentLocation() async {
     setState(() => _isGettingLocation = true);
 
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      print('📍 service enabled: $serviceEnabled');
-
       if (!serviceEnabled) {
         _showSnackBar('please enable location services');
         setState(() => _isGettingLocation = false);
@@ -67,11 +64,8 @@ class _PostScreenState extends State<PostScreen> {
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
-      print('📍 permission: $permission');
-
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        print('📍 permission after request: $permission');
         if (permission == LocationPermission.denied) {
           _showSnackBar('location permission denied');
           setState(() => _isGettingLocation = false);
@@ -85,11 +79,14 @@ class _PostScreenState extends State<PostScreen> {
         return;
       }
 
-      print('📍 getting position...');
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.low,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('location timed out');
+        },
       );
-      print('📍 position: ${position.latitude}, ${position.longitude}');
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
@@ -100,7 +97,6 @@ class _PostScreenState extends State<PostScreen> {
         Placemark place = placemarks.first;
         String address =
             '${place.street ?? ''}, ${place.subLocality ?? ''}, ${place.locality ?? ''}';
-        print('📍 address: $address');
         setState(() {
           _latitude = position.latitude;
           _longitude = position.longitude;
@@ -109,13 +105,72 @@ class _PostScreenState extends State<PostScreen> {
         });
       }
     } catch (e) {
-      print('🔴 location error: $e');
-      _showSnackBar('could not get location: $e');
       setState(() => _isGettingLocation = false);
+      _showManualLocationDialog();
     }
   }
 
-  // CAMERA SENSOR — take or pick photo
+  void _showManualLocationDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'enter location manually',
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'e.g. Library, Block B',
+            hintStyle: const TextStyle(color: Color(0xFF444444)),
+            filled: true,
+            fillColor: const Color(0xFF0F0F0F),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF22D3EE)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'cancel',
+              style: TextStyle(color: Color(0xFF555555)),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                setState(() {
+                  _location = controller.text.trim();
+                  _latitude = 6.9271;
+                  _longitude = 79.8612;
+                });
+              }
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'set location',
+              style: TextStyle(color: Color(0xFF22D3EE)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickImage() async {
     showModalBottomSheet(
       context: context,
@@ -152,12 +207,11 @@ class _PostScreenState extends State<PostScreen> {
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      final XFile? photo = await _picker.pickImage(
-                        source: ImageSource.camera,
-                        imageQuality: 60,
+                      final File? image = await _imageService.pickItemPhoto(
+                        ImageSource.camera,
                       );
-                      if (photo != null) {
-                        setState(() => _itemImage = File(photo.path));
+                      if (image != null) {
+                        setState(() => _itemImage = image);
                       }
                     },
                     child: Container(
@@ -189,12 +243,11 @@ class _PostScreenState extends State<PostScreen> {
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      final XFile? photo = await _picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 60,
+                      final File? image = await _imageService.pickItemPhoto(
+                        ImageSource.gallery,
                       );
-                      if (photo != null) {
-                        setState(() => _itemImage = File(photo.path));
+                      if (image != null) {
+                        setState(() => _itemImage = image);
                       }
                     },
                     child: Container(
@@ -283,8 +336,7 @@ class _PostScreenState extends State<PostScreen> {
                         ),
                         child: Column(
                           children: [
-                            const Text('🎉',
-                                style: TextStyle(fontSize: 24)),
+                            const Text('🎉', style: TextStyle(fontSize: 24)),
                             const SizedBox(height: 4),
                             Text(
                               'i found it',
@@ -321,8 +373,7 @@ class _PostScreenState extends State<PostScreen> {
                         ),
                         child: Column(
                           children: [
-                            const Text('😭',
-                                style: TextStyle(fontSize: 24)),
+                            const Text('😭', style: TextStyle(fontSize: 24)),
                             const SizedBox(height: 4),
                             Text(
                               'i lost it',
@@ -344,7 +395,7 @@ class _PostScreenState extends State<PostScreen> {
 
               const SizedBox(height: 20),
 
-              // photo upload
+              // photo upload — 1:1 ratio
               const Text(
                 'item photo',
                 style: TextStyle(
@@ -354,58 +405,59 @@ class _PostScreenState extends State<PostScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  width: double.infinity,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _itemImage != null
-                          ? const Color(0xFF22D3EE)
-                          : const Color(0xFF2A2A2A),
-                      width: _itemImage != null ? 1.5 : 1,
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _itemImage != null
+                            ? const Color(0xFF22D3EE)
+                            : const Color(0xFF2A2A2A),
+                        width: _itemImage != null ? 1.5 : 1,
+                      ),
                     ),
-                  ),
-                  child: _itemImage != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _itemImage!,
-                            fit: BoxFit.cover,
+                    child: _itemImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              _itemImage!,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.camera_alt,
+                                  color: Color(0xFF22D3EE), size: 36),
+                              SizedBox(height: 8),
+                              Text(
+                                'tap to add photo',
+                                style: TextStyle(
+                                  color: Color(0xFF22D3EE),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'camera or gallery',
+                                style: TextStyle(
+                                  color: Color(0xFF555555),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
-                        )
-                      : const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.camera_alt,
-                                color: Color(0xFF22D3EE), size: 36),
-                            SizedBox(height: 8),
-                            Text(
-                              'tap to add photo',
-                              style: TextStyle(
-                                color: Color(0xFF22D3EE),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'camera or gallery',
-                              style: TextStyle(
-                                color: Color(0xFF555555),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // item name
               _buildLabel('item name'),
               const SizedBox(height: 8),
               _buildTextField(
@@ -415,21 +467,17 @@ class _PostScreenState extends State<PostScreen> {
 
               const SizedBox(height: 16),
 
-              // description
               _buildLabel('description'),
               const SizedBox(height: 8),
               TextField(
                 controller: _descriptionController,
                 maxLines: 3,
                 style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration(
-                  'describe the item in detail...',
-                ),
+                decoration: _inputDecoration('describe the item in detail...'),
               ),
 
               const SizedBox(height: 16),
 
-              // category
               _buildLabel('category'),
               const SizedBox(height: 8),
               Container(
@@ -460,7 +508,6 @@ class _PostScreenState extends State<PostScreen> {
 
               const SizedBox(height: 16),
 
-              // location
               _buildLabel('location'),
               const SizedBox(height: 8),
               GestureDetector(
@@ -526,7 +573,6 @@ class _PostScreenState extends State<PostScreen> {
 
               const SizedBox(height: 32),
 
-              // submit button
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -625,7 +671,6 @@ class _PostScreenState extends State<PostScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // get user data
       final userData = await _authService.getUserData();
       final user = FirebaseAuth.instance.currentUser;
 
@@ -635,28 +680,22 @@ class _PostScreenState extends State<PostScreen> {
         return;
       }
 
-      // convert image to base64
-    // compress image before saving
-final compressedBytes = await FlutterImageCompress.compressWithFile(
-  _itemImage!.path,
-  quality: 30,
-  minWidth: 600,
-  minHeight: 600,
-);
+      // compress image before saving
+      final compressedBytes = await FlutterImageCompress.compressWithFile(
+        _itemImage!.path,
+        quality: 30,
+        minWidth: 600,
+        minHeight: 600,
+      );
 
-if (compressedBytes == null) {
-  _showSnackBar('could not process image');
-  setState(() => _isLoading = false);
-  return;
-}
+      if (compressedBytes == null) {
+        _showSnackBar('could not process image');
+        setState(() => _isLoading = false);
+        return;
+      }
 
-print('📸 compressed size: ${compressedBytes.length} bytes');
-String base64Image = base64Encode(compressedBytes);
-print('📸 base64 size: ${base64Image.length} chars');
+      String base64Image = base64Encode(compressedBytes);
 
-
-
-      // create item model
       final item = ItemModel(
         id: '',
         title: _titleController.text.trim(),
@@ -673,7 +712,6 @@ print('📸 base64 size: ${base64Image.length} chars');
         createdAt: DateTime.now(),
       );
 
-      // save to Firestore
       String? error = await _firestoreService.addItem(item);
 
       setState(() => _isLoading = false);
@@ -682,7 +720,6 @@ print('📸 base64 size: ${base64Image.length} chars');
         _showSnackBar(error);
       } else {
         if (mounted) {
-          // success!
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('post uploaded successfully!'),

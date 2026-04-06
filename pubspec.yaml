@@ -44,6 +44,7 @@ dependencies:
   flutter_map: ^8.2.2
   flutter_image_compress: ^2.4.0
   latlong2: ^0.9.1
+  image_cropper: ^12.1.1
 
 dev_dependencies:
   flutter_test:

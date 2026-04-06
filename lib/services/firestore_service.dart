@@ -6,18 +6,11 @@ class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // GET ALL ITEMS — returns a real time stream
-  // like a websocket in React — updates automatically!
+  // GET ALL ITEMS — real time stream
   Stream<List<ItemModel>> getItems({String filter = 'all'}) {
     Query query = _firestore
         .collection('items')
         .orderBy('createdAt', descending: true);
-
-    if (filter == 'found') {
-      query = query.where('type', isEqualTo: 'found');
-    } else if (filter == 'lost') {
-      query = query.where('type', isEqualTo: 'lost');
-    }
 
     return query.snapshots().map((snapshot) {
       return snapshot.docs
@@ -26,7 +19,7 @@ class FirestoreService {
     });
   }
 
-  // GET MY ITEMS
+  // GET MY ITEMS — no orderBy to avoid index errors
   Stream<List<ItemModel>> getMyItems() {
     String? uid = _auth.currentUser?.uid;
     if (uid == null) return Stream.value([]);
@@ -34,21 +27,26 @@ class FirestoreService {
     return _firestore
         .collection('items')
         .where('postedBy', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final items = snapshot.docs
           .map((doc) => ItemModel.fromFirestore(doc))
           .toList();
+      // sort locally
+      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return items;
     });
   }
 
   // ADD ITEM
   Future<String?> addItem(ItemModel item) async {
     try {
+      print('💾 saving to firestore...');
       await _firestore.collection('items').add(item.toMap());
-      return null; // success
+      print('💾 saved successfully!');
+      return null;
     } catch (e) {
+      print('🔴 firestore error: $e');
       return 'failed to post item. please try again';
     }
   }

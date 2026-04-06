@@ -15,28 +15,9 @@ class _MapScreenState extends State<MapScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final MapController _mapController = MapController();
   String _filter = 'all';
-  List<ItemModel> _items = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadItems();
-  }
-
-  Future<void> _loadItems() async {
-    final items = await _firestoreService.getItemsForMap();
-    if (mounted) {
-      setState(() {
-        _items = items;
-        _isLoading = false;
-      });
-    }
-  }
 
   List<ItemModel> get _filteredItems {
-    if (_filter == 'all') return _items;
-    return _items.where((item) => item.type == _filter).toList();
+    return [];
   }
 
   @override
@@ -54,153 +35,151 @@ class _MapScreenState extends State<MapScreen> {
           'map view',
           style: TextStyle(color: Colors.white, fontSize: 18),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF22D3EE)),
-            onPressed: () {
-              setState(() => _isLoading = true);
-              _loadItems();
-            },
-          ),
-        ],
       ),
-      body: Column(
-        children: [
-          // filter tabs
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            color: const Color(0xFF0F0F0F),
-            child: Row(
-              children: [
-                _filterTab('all', 'all'),
-                const SizedBox(width: 8),
-                _filterTab('found', 'found'),
-                const SizedBox(width: 8),
-                _filterTab('lost', 'lost'),
-                const Spacer(),
-                // legend
-                Row(
+      body: StreamBuilder<List<ItemModel>>(
+        stream: _firestoreService.getItems(filter: 'all'),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF22D3EE)),
+            );
+          }
+
+          final allItems = snapshot.data ?? [];
+
+          // apply filter
+          final items = _filter == 'all'
+              ? allItems
+              : allItems.where((i) => i.type == _filter).toList();
+
+          return Column(
+            children: [
+              // filter tabs
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                color: const Color(0xFF0F0F0F),
+                child: Row(
                   children: [
-                    _legendDot(const Color(0xFF22D3EE)),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'found',
-                      style: TextStyle(
-                        color: Color(0xFF555555),
-                        fontSize: 11,
-                      ),
+                    _filterTab('all', 'all'),
+                    const SizedBox(width: 8),
+                    _filterTab('found', 'found'),
+                    const SizedBox(width: 8),
+                    _filterTab('lost', 'lost'),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        _legendDot(const Color(0xFF22D3EE)),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'found',
+                          style: TextStyle(
+                            color: Color(0xFF555555),
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _legendDot(const Color(0xFFF87171)),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'lost',
+                          style: TextStyle(
+                            color: Color(0xFF555555),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    _legendDot(const Color(0xFFF87171)),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'lost',
-                      style: TextStyle(
+                  ],
+                ),
+              ),
+
+              // map
+              Expanded(
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: items.isNotEmpty &&
+                            items.first.latitude != 0
+                        ? LatLng(
+                            items.first.latitude,
+                            items.first.longitude,
+                          )
+                        : const LatLng(6.9271, 79.8612),
+                    initialZoom: 15,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.back_to_you',
+                    ),
+                    MarkerLayer(
+                      markers: items
+                          .where((item) =>
+                              item.latitude != 0 && item.longitude != 0)
+                          .map((item) {
+                        bool isFound = item.type == 'found';
+                        return Marker(
+                          point: LatLng(item.latitude, item.longitude),
+                          width: 40,
+                          height: 40,
+                          child: GestureDetector(
+                            onTap: () => _showItemBottomSheet(item),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isFound
+                                    ? const Color(0xFF22D3EE)
+                                    : const Color(0xFFF87171),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  isFound ? Icons.check : Icons.search,
+                                  color: Colors.black,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+
+              // items count bar
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                color: const Color(0xFF0F0F0F),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      color: Color(0xFF22D3EE),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${items.where((i) => i.latitude != 0).length} items on map',
+                      style: const TextStyle(
                         color: Color(0xFF555555),
-                        fontSize: 11,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-
-          // map
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF22D3EE),
-                    ),
-                  )
-                : FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: _filteredItems.isNotEmpty
-                          ? LatLng(
-                              _filteredItems.first.latitude,
-                              _filteredItems.first.longitude,
-                            )
-                          : const LatLng(6.9271, 79.8612),
-                      initialZoom: 15,
-                    ),
-                    children: [
-                      // map tiles from OpenStreetMap
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.back_to_you',
-                      ),
-
-                      // markers for each item
-                      MarkerLayer(
-                        markers: _filteredItems
-                            .where((item) =>
-                                item.latitude != 0 && item.longitude != 0)
-                            .map((item) {
-                          bool isFound = item.type == 'found';
-                          return Marker(
-                            point: LatLng(item.latitude, item.longitude),
-                            width: 40,
-                            height: 40,
-                            child: GestureDetector(
-                              onTap: () => _showItemBottomSheet(item),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: isFound
-                                      ? const Color(0xFF22D3EE)
-                                      : const Color(0xFFF87171),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    isFound
-                                        ? Icons.check
-                                        : Icons.search,
-                                    color: Colors.black,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-          ),
-
-          // items count bar
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ),
-            color: const Color(0xFF0F0F0F),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.location_on,
-                  color: Color(0xFF22D3EE),
-                  size: 16,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${_filteredItems.where((i) => i.latitude != 0).length} items on map',
-                  style: const TextStyle(
-                    color: Color(0xFF555555),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
