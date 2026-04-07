@@ -8,6 +8,7 @@ class ItemModel {
   final String type;
   final String status;
   final String location;
+  final String manualLocation;
   final double latitude;
   final double longitude;
   final String imageUrl;
@@ -23,6 +24,7 @@ class ItemModel {
     required this.type,
     required this.status,
     required this.location,
+    this.manualLocation = '',
     required this.latitude,
     required this.longitude,
     required this.imageUrl,
@@ -41,6 +43,7 @@ class ItemModel {
       type: data['type'] ?? 'lost',
       status: data['status'] ?? 'found',
       location: data['location'] ?? '',
+      manualLocation: data['manualLocation'] ?? '',
       latitude: (data['latitude'] ?? 0.0).toDouble(),
       longitude: (data['longitude'] ?? 0.0).toDouble(),
       imageUrl: data['imageUrl'] ?? '',
@@ -58,6 +61,7 @@ class ItemModel {
       'type': type,
       'status': status,
       'location': location,
+      'manualLocation': manualLocation,
       'latitude': latitude,
       'longitude': longitude,
       'imageUrl': imageUrl,

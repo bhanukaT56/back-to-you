@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-
+import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
@@ -21,15 +23,20 @@ class PostScreen extends StatefulWidget {
 class _PostScreenState extends State<PostScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _manualLocationController = TextEditingController();
   final FirestoreService _firestoreService = FirestoreService();
   final AuthService _authService = AuthService();
   final ImageService _imageService = ImageService();
+  final MapController _mapController = MapController();
 
   String _type = 'found';
   String _category = 'Electronics';
   String _location = '';
+  String _manualLocation = '';
   double _latitude = 0.0;
   double _longitude = 0.0;
+  LatLng _selectedMapLocation = const LatLng(6.9271, 79.8612);
+  bool _mapLocationSelected = false;
   File? _itemImage;
   bool _isLoading = false;
   bool _isGettingLocation = false;
@@ -49,6 +56,7 @@ class _PostScreenState extends State<PostScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _manualLocationController.dispose();
     super.dispose();
   }
 
@@ -79,14 +87,12 @@ class _PostScreenState extends State<PostScreen> {
         return;
       }
 
-   Position position = await Geolocator.getCurrentPosition(
-  desiredAccuracy: LocationAccuracy.best,
-).timeout(
-  const Duration(seconds: 15),
-  onTimeout: () {
-    throw Exception('location timed out');
-  },
-);
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('location timed out'),
+      );
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
@@ -207,12 +213,9 @@ class _PostScreenState extends State<PostScreen> {
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      final File? image = await _imageService.pickItemPhoto(
-                        ImageSource.camera,
-                      );
-                      if (image != null) {
-                        setState(() => _itemImage = image);
-                      }
+                      final File? image =
+                          await _imageService.pickItemPhoto(ImageSource.camera);
+                      if (image != null) setState(() => _itemImage = image);
                     },
                     child: Container(
                       padding: const EdgeInsets.all(16),
@@ -226,13 +229,10 @@ class _PostScreenState extends State<PostScreen> {
                           Icon(Icons.camera_alt,
                               color: Color(0xFF22D3EE), size: 32),
                           SizedBox(height: 8),
-                          Text(
-                            'camera',
-                            style: TextStyle(
-                              color: Color(0xFF22D3EE),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          Text('camera',
+                              style: TextStyle(
+                                  color: Color(0xFF22D3EE),
+                                  fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
@@ -243,12 +243,9 @@ class _PostScreenState extends State<PostScreen> {
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      final File? image = await _imageService.pickItemPhoto(
-                        ImageSource.gallery,
-                      );
-                      if (image != null) {
-                        setState(() => _itemImage = image);
-                      }
+                      final File? image = await _imageService
+                          .pickItemPhoto(ImageSource.gallery);
+                      if (image != null) setState(() => _itemImage = image);
                     },
                     child: Container(
                       padding: const EdgeInsets.all(16),
@@ -262,13 +259,10 @@ class _PostScreenState extends State<PostScreen> {
                           Icon(Icons.photo_library,
                               color: Color(0xFF555555), size: 32),
                           SizedBox(height: 8),
-                          Text(
-                            'gallery',
-                            style: TextStyle(
-                              color: Color(0xFF555555),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          Text('gallery',
+                              style: TextStyle(
+                                  color: Color(0xFF555555),
+                                  fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
@@ -309,10 +303,9 @@ class _PostScreenState extends State<PostScreen> {
               const Text(
                 'what happened?',
                 style: TextStyle(
-                  color: Color(0xFFAAAAAA),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
               Row(
@@ -336,7 +329,8 @@ class _PostScreenState extends State<PostScreen> {
                         ),
                         child: Column(
                           children: [
-                            const Text('🎉', style: TextStyle(fontSize: 24)),
+                            const Text('🎉',
+                                style: TextStyle(fontSize: 24)),
                             const SizedBox(height: 4),
                             Text(
                               'i found it',
@@ -373,7 +367,8 @@ class _PostScreenState extends State<PostScreen> {
                         ),
                         child: Column(
                           children: [
-                            const Text('😭', style: TextStyle(fontSize: 24)),
+                            const Text('😭',
+                                style: TextStyle(fontSize: 24)),
                             const SizedBox(height: 4),
                             Text(
                               'i lost it',
@@ -395,14 +390,13 @@ class _PostScreenState extends State<PostScreen> {
 
               const SizedBox(height: 20),
 
-              // photo upload — 1:1 ratio
+              // photo upload
               const Text(
                 'item photo',
                 style: TextStyle(
-                  color: Color(0xFFAAAAAA),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
               AspectRatio(
@@ -424,10 +418,7 @@ class _PostScreenState extends State<PostScreen> {
                     child: _itemImage != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              _itemImage!,
-                              fit: BoxFit.cover,
-                            ),
+                            child: Image.file(_itemImage!, fit: BoxFit.cover),
                           )
                         : const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -435,21 +426,14 @@ class _PostScreenState extends State<PostScreen> {
                               Icon(Icons.camera_alt,
                                   color: Color(0xFF22D3EE), size: 36),
                               SizedBox(height: 8),
-                              Text(
-                                'tap to add photo',
-                                style: TextStyle(
-                                  color: Color(0xFF22D3EE),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                              Text('tap to add photo',
+                                  style: TextStyle(
+                                      color: Color(0xFF22D3EE),
+                                      fontWeight: FontWeight.w500)),
                               SizedBox(height: 4),
-                              Text(
-                                'camera or gallery',
-                                style: TextStyle(
-                                  color: Color(0xFF555555),
-                                  fontSize: 12,
-                                ),
-                              ),
+                              Text('camera or gallery',
+                                  style: TextStyle(
+                                      color: Color(0xFF555555), fontSize: 12)),
                             ],
                           ),
                   ),
@@ -458,38 +442,40 @@ class _PostScreenState extends State<PostScreen> {
 
               const SizedBox(height: 20),
 
-           _buildLabel('item name'),
-const SizedBox(height: 4),
-const Text(
-  'max 15 characters',
-  style: TextStyle(
-    color: Color(0xFF444444),
-    fontSize: 11,
-  ),
-),
-const SizedBox(height: 8),
-TextField(
-  controller: _titleController,
-  maxLength: 15,
-  style: const TextStyle(color: Colors.white),
-  decoration: _inputDecoration('e.g. Blue Laptop').copyWith(
-    counterStyle: const TextStyle(color: Color(0xFF555555)),
-  ),
-),
+              // item name
+              _buildLabel('item name'),
+              const SizedBox(height: 4),
+              const Text(
+                'max 15 characters',
+                style: TextStyle(color: Color(0xFF444444), fontSize: 11),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _titleController,
+                maxLength: 15,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecoration('e.g. Blue Laptop').copyWith(
+                  counterStyle:
+                      const TextStyle(color: Color(0xFF555555)),
+                ),
+              ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
+              // description
               _buildLabel('description'),
               const SizedBox(height: 8),
               TextField(
                 controller: _descriptionController,
                 maxLines: 3,
                 style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('describe the item in detail...'),
+                decoration:
+                    _inputDecoration('describe the item in detail...'),
               ),
 
               const SizedBox(height: 16),
 
+              // category
               _buildLabel('category'),
               const SizedBox(height: 8),
               Container(
@@ -507,12 +493,11 @@ TextField(
                     style: const TextStyle(color: Colors.white),
                     items: _categories.map((cat) {
                       return DropdownMenuItem(
-                        value: cat,
-                        child: Text(cat),
-                      );
+                          value: cat, child: Text(cat));
                     }).toList(),
                     onChanged: (value) {
-                      if (value != null) setState(() => _category = value);
+                      if (value != null)
+                        setState(() => _category = value);
                     },
                   ),
                 ),
@@ -520,71 +505,205 @@ TextField(
 
               const SizedBox(height: 16),
 
+              // LOCATION SECTION
               _buildLabel('location'),
               const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _getCurrentLocation,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _location.isNotEmpty
-                          ? const Color(0xFF22D3EE)
-                          : const Color(0xFF2A2A2A),
+
+              if (_type == 'found') ...[
+                // FOUND ITEM — GPS + manual type
+                GestureDetector(
+                  onTap: _getCurrentLocation,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _location.isNotEmpty
+                            ? const Color(0xFF22D3EE)
+                            : const Color(0xFF2A2A2A),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        _isGettingLocation
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    color: Color(0xFF22D3EE), strokeWidth: 2),
+                              )
+                            : Icon(
+                                Icons.my_location,
+                                color: _location.isNotEmpty
+                                    ? const Color(0xFF22D3EE)
+                                    : const Color(0xFF555555),
+                                size: 20,
+                              ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _isGettingLocation
+                                ? 'getting your location...'
+                                : _location.isNotEmpty
+                                    ? _location
+                                    : 'tap to get current GPS location',
+                            style: TextStyle(
+                              color: _location.isNotEmpty
+                                  ? Colors.white
+                                  : const Color(0xFF555555),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      _isGettingLocation
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF22D3EE),
-                                strokeWidth: 2,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'GPS location is mandatory for found items',
+                  style:
+                      TextStyle(color: Color(0xFF444444), fontSize: 11),
+                ),
+                const SizedBox(height: 12),
+
+                // manual location note for found item
+                _buildLabel('additional location note (optional)'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _manualLocationController,
+                  style: const TextStyle(color: Colors.white),
+                  onChanged: (val) =>
+                      setState(() => _manualLocation = val),
+                  decoration: _inputDecoration(
+                      'e.g. near the library entrance, 2nd floor'),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'add extra location details to help identify the spot',
+                  style:
+                      TextStyle(color: Color(0xFF444444), fontSize: 11),
+                ),
+              ] else ...[
+                // LOST ITEM — map picker + manual type
+                const Text(
+                  'tap on the map to pin where you last saw it',
+                  style:
+                      TextStyle(color: Color(0xFF555555), fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+
+                // map picker
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _mapLocationSelected
+                          ? const Color(0xFF22D3EE)
+                          : const Color(0xFF2A2A2A),
+                      width: _mapLocationSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: _selectedMapLocation,
+                        initialZoom: 15,
+                        onTap: (tapPosition, point) async {
+                          // get address from tapped coordinates
+                          List<Placemark> placemarks =
+                              await placemarkFromCoordinates(
+                                  point.latitude, point.longitude);
+                          String address = '';
+                          if (placemarks.isNotEmpty) {
+                            Placemark place = placemarks.first;
+                            address =
+                                '${place.street ?? ''}, ${place.subLocality ?? ''}, ${place.locality ?? ''}';
+                          }
+                          setState(() {
+                            _selectedMapLocation = point;
+                            _latitude = point.latitude;
+                            _longitude = point.longitude;
+                            _location = address.isNotEmpty
+                                ? address
+                                : '${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}';
+                            _mapLocationSelected = true;
+                          });
+                        },
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.back_to_you',
+                        ),
+                        if (_mapLocationSelected)
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: _selectedMapLocation,
+                                width: 40,
+                                height: 40,
+                                child: const Icon(
+                                  Icons.location_pin,
+                                  color: Color(0xFFF87171),
+                                  size: 40,
+                                ),
                               ),
-                            )
-                          : Icon(
-                              Icons.location_on,
-                              color: _location.isNotEmpty
-                                  ? const Color(0xFF22D3EE)
-                                  : const Color(0xFF555555),
-                              size: 20,
-                            ),
-                      const SizedBox(width: 10),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                if (_mapLocationSelected) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on,
+                          color: Color(0xFF22D3EE), size: 14),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          _isGettingLocation
-                              ? 'getting your location...'
-                              : _location.isNotEmpty
-                                  ? _location
-                                  : 'tap to get current location',
-                          style: TextStyle(
-                            color: _location.isNotEmpty
-                                ? Colors.white
-                                : const Color(0xFF555555),
-                            fontSize: 13,
-                          ),
+                          _location,
+                          style: const TextStyle(
+                              color: Color(0xFF22D3EE), fontSize: 12),
                         ),
                       ),
                     ],
                   ),
+                ],
+
+                const SizedBox(height: 12),
+
+                // manual type for lost item
+                _buildLabel('or type location manually'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _manualLocationController,
+                  style: const TextStyle(color: Colors.white),
+                  onChanged: (val) {
+                    setState(() {
+                      _manualLocation = val;
+                      if (val.isNotEmpty && !_mapLocationSelected) {
+                        _location = val;
+                      }
+                    });
+                  },
+                  decoration:
+                      _inputDecoration('e.g. Library, Block B, 2nd floor'),
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'uses your GPS sensor to tag the exact location',
-                style: TextStyle(
-                  color: Color(0xFF444444),
-                  fontSize: 11,
-                ),
-              ),
+              ],
 
               const SizedBox(height: 32),
 
+              // submit button
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -594,17 +713,14 @@ TextField(
                     backgroundColor: const Color(0xFF22D3EE),
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.black)
                       : const Text(
                           'post it',
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                 ),
               ),
@@ -620,14 +736,11 @@ TextField(
     return Text(
       text,
       style: const TextStyle(
-        color: Color(0xFFAAAAAA),
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
-      ),
+          color: Color(0xFFAAAAAA),
+          fontSize: 13,
+          fontWeight: FontWeight.w500),
     );
   }
-
-  
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
@@ -645,15 +758,13 @@ TextField(
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Color(0xFF22D3EE),
-          width: 1.5,
-        ),
+        borderSide:
+            const BorderSide(color: Color(0xFF22D3EE), width: 1.5),
       ),
     );
   }
 
- Future<void> _handlePost() async {
+  Future<void> _handlePost() async {
     if (_titleController.text.isEmpty) {
       _showSnackBar('please enter item name');
       return;
@@ -666,9 +777,26 @@ TextField(
       _showSnackBar('please add a photo of the item');
       return;
     }
-    if (_location.isEmpty) {
-      _showSnackBar('please get your current location');
+
+    // location validation
+    if (_type == 'found' && _location.isEmpty) {
+      _showSnackBar('GPS location is mandatory for found items');
       return;
+    }
+    if (_type == 'lost' &&
+        _location.isEmpty &&
+        _manualLocationController.text.isEmpty) {
+      _showSnackBar('please pin a location on the map or type it manually');
+      return;
+    }
+
+    // for lost item with only manual location
+    if (_type == 'lost' && _location.isEmpty) {
+      setState(() {
+        _location = _manualLocationController.text.trim();
+        _latitude = 6.9271;
+        _longitude = 79.8612;
+      });
     }
 
     setState(() => _isLoading = true);
@@ -683,6 +811,19 @@ TextField(
         return;
       }
 
+      final compressedBytes = await FlutterImageCompress.compressWithFile(
+        _itemImage!.path,
+        quality: 30,
+        minWidth: 600,
+        minHeight: 600,
+      );
+
+      if (compressedBytes == null) {
+        _showSnackBar('could not process image');
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final item = ItemModel(
         id: '',
         title: _titleController.text.trim(),
@@ -691,6 +832,7 @@ TextField(
         type: _type,
         status: _type == 'found' ? 'found' : 'lost',
         location: _location,
+        manualLocation: _manualLocationController.text.trim(),
         latitude: _latitude,
         longitude: _longitude,
         imageUrl: '',
@@ -699,7 +841,6 @@ TextField(
         createdAt: DateTime.now(),
       );
 
-      // pass the actual image file to addItem
       String? error = await _firestoreService.addItem(item, _itemImage!);
 
       setState(() => _isLoading = false);
