@@ -111,12 +111,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                 const SizedBox(height: 16),
 
-                  // status tracker
-                  _buildStatusTracker(item.status),
-
-                  const SizedBox(height: 20),
+// status tracker — only for found items
+if (isFound) _buildStatusTracker(item.status),
+if (isFound) const SizedBox(height: 20),
 
                   // details card
                   Container(
@@ -306,7 +305,56 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   // buttons for the person who posted the item
-  Widget _buildMyPostActions(ItemModel item) {
+ Widget _buildMyPostActions(ItemModel item) {
+    bool isFound = item.type == 'found';
+
+    if (!isFound) {
+      // lost item — show simple status update for owner
+      if (item.status == 'claimed') {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF052E16),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Center(
+            child: Text(
+              '✓ you got your item back!',
+              style: TextStyle(
+                color: Color(0xFF4ADE80),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        );
+      }
+      return SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton(
+          onPressed: _isUpdating ? null : () => _showGotItemBackDialog(item),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4ADE80),
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: _isUpdating
+              ? const CircularProgressIndicator(color: Colors.black)
+              : const Text(
+                  'i got my item back!',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+        ),
+      );
+    }
+
+    // found item — show status update buttons
     return Column(
       children: [
         const Text(
@@ -318,54 +366,70 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            if (item.status == 'found')
-              Expanded(
-                child: _buildStatusButton(
-                  label: 'mark as submitted',
-                  color: const Color(0xFF22D3EE),
-                  textColor: Colors.black,
-                  onTap: () => _updateStatus(item.id, 'submitted'),
+        if (item.status == 'found')
+          _buildStatusButton(
+            label: 'mark as submitted to security',
+            color: const Color(0xFF22D3EE),
+            textColor: Colors.black,
+            onTap: () => _updateStatus(item.id, 'submitted'),
+          ),
+        if (item.status == 'submitted')
+          _buildStatusButton(
+            label: 'mark as claimed',
+            color: const Color(0xFF4ADE80),
+            textColor: Colors.black,
+            onTap: () => _updateStatus(item.id, 'claimed'),
+          ),
+        if (item.status == 'claimed')
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF052E16),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Center(
+              child: Text(
+                '✓ item has been claimed',
+                style: TextStyle(
+                  color: Color(0xFF4ADE80),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            if (item.status == 'submitted') ...[
-              Expanded(
-                child: _buildStatusButton(
-                  label: 'mark as claimed',
-                  color: const Color(0xFF4ADE80),
-                  textColor: Colors.black,
-                  onTap: () => _updateStatus(item.id, 'claimed'),
-                ),
-              ),
-            ],
-            if (item.status == 'claimed')
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF052E16),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '✓ item has been claimed',
-                      style: TextStyle(
-                        color: Color(0xFF4ADE80),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+            ),
+          ),
       ],
     );
   }
 
   // claim button for other users
-  Widget _buildClaimButton(ItemModel item) {
+ Widget _buildClaimButton(ItemModel item) {
+    bool isFound = item.type == 'found';
+
+    // lost item posted by someone else — no action for other users
+    if (!isFound) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+        ),
+        child: const Center(
+          child: Text(
+            'if you found this item, please contact the security office',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFAAAAAA),
+              fontSize: 13,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // found item — already claimed
     if (item.status == 'claimed') {
       return Container(
         width: double.infinity,
@@ -386,28 +450,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       );
     }
 
-    if (item.type == 'lost') {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF2A2A2A)),
-        ),
-        child: const Center(
-          child: Text(
-            'contact security office to report finding this item',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFFAAAAAA),
-              fontSize: 13,
-            ),
-          ),
-        ),
-      );
-    }
-
+    // found item — can be claimed
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -429,6 +472,42 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+      ),
+    );
+  }
+
+  void _showGotItemBackDialog(ItemModel item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'got your item back?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'mark this item as returned so others know it has been recovered!',
+          style: TextStyle(color: Color(0xFF888888), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'cancel',
+              style: TextStyle(color: Color(0xFF555555)),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateStatus(item.id, 'claimed');
+            },
+            child: const Text(
+              'yes, i got it back!',
+              style: TextStyle(color: Color(0xFF4ADE80)),
+            ),
+          ),
+        ],
       ),
     );
   }
