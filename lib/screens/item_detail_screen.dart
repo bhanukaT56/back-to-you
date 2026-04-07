@@ -346,7 +346,7 @@ else
     bool isFound = item.type == 'found';
 
     if (!isFound) {
-      // lost item — show simple status update for owner
+      // lost item owner
       if (item.status == 'claimed') {
         return Container(
           width: double.infinity,
@@ -391,51 +391,57 @@ else
       );
     }
 
-    // found item — show status update buttons
-    return Column(
-      children: [
-        const Text(
-          'update item status',
+    // found item — finder can only mark as submitted
+    if (item.status == 'found') {
+      return _buildStatusButton(
+        label: 'mark as submitted to security',
+        color: const Color(0xFF22D3EE),
+        textColor: Colors.black,
+        onTap: () => _updateStatus(item.id, 'submitted'),
+      );
+    }
+
+    // submitted — waiting for admin to mark as claimed
+    if (item.status == 'submitted') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF083344),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF22D3EE)),
+        ),
+        child: const Center(
+          child: Text(
+            '⏳ submitted to security — waiting for claim',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF22D3EE),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // claimed
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF052E16),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Center(
+        child: Text(
+          '✓ item has been claimed',
           style: TextStyle(
-            color: Color(0xFFAAAAAA),
-            fontSize: 13,
+            color: Color(0xFF4ADE80),
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 12),
-        if (item.status == 'found')
-          _buildStatusButton(
-            label: 'mark as submitted to security',
-            color: const Color(0xFF22D3EE),
-            textColor: Colors.black,
-            onTap: () => _updateStatus(item.id, 'submitted'),
-          ),
-        if (item.status == 'submitted')
-          _buildStatusButton(
-            label: 'mark as claimed',
-            color: const Color(0xFF4ADE80),
-            textColor: Colors.black,
-            onTap: () => _updateStatus(item.id, 'claimed'),
-          ),
-        if (item.status == 'claimed')
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF052E16),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Center(
-              child: Text(
-                '✓ item has been claimed',
-                style: TextStyle(
-                  color: Color(0xFF4ADE80),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 
@@ -443,7 +449,7 @@ else
  Widget _buildClaimButton(ItemModel item) {
     bool isFound = item.type == 'found';
 
-    // lost item posted by someone else — no action for other users
+    // lost item — no action for other users
     if (!isFound) {
       return Container(
         width: double.infinity,
@@ -455,7 +461,7 @@ else
         ),
         child: const Center(
           child: Text(
-            'if you found this item, please contact the security office',
+            'if you found this item please submit it to the security office',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFFAAAAAA),
@@ -487,28 +493,47 @@ else
       );
     }
 
-    // found item — can be claimed
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: _isUpdating ? null : () => _showClaimDialog(item),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22D3EE),
-          foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+    // found item — submitted, waiting for admin
+    if (item.status == 'submitted') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+        ),
+        child: const Center(
+          child: Text(
+            'item is at the security office — visit to claim it',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFAAAAAA),
+              fontSize: 13,
+            ),
           ),
         ),
-        child: _isUpdating
-            ? const CircularProgressIndicator(color: Colors.black)
-            : const Text(
-                'this is mine — claim it',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+      );
+    }
+
+    // found item — still with finder
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF2A2A2A)),
+      ),
+      child: const Center(
+        child: Text(
+          'contact the security office if this is your item',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFFAAAAAA),
+            fontSize: 13,
+          ),
+        ),
       ),
     );
   }
@@ -606,39 +631,5 @@ else
     }
   }
 
-  void _showClaimDialog(ItemModel item) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          'claim this item?',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'please go to the security office with your student ID to collect this item.',
-          style: TextStyle(color: Color(0xFF888888), height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'cancel',
-              style: TextStyle(color: Color(0xFF555555)),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _updateStatus(item.id, 'claimed');
-            },
-            child: const Text(
-              'yes, claim it',
-              style: TextStyle(color: Color(0xFF22D3EE)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  
 }

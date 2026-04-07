@@ -11,6 +11,24 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // GET USER ROLE
+Future<String> getUserRole() async {
+  try {
+    User? user = _auth.currentUser;
+    if (user == null) return 'student';
+
+    DocumentSnapshot doc =
+        await _firestore.collection('users').doc(user.uid).get();
+
+    if (doc.exists) {
+      return doc['role'] ?? 'student';
+    }
+    return 'student';
+  } catch (e) {
+    return 'student';
+  }
+}
+
   // REGISTER
   Future<String?> register({
     required String name,
