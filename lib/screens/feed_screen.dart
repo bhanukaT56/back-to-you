@@ -444,53 +444,66 @@ Padding(
       ),
       const SizedBox(height: 8),
       // type and category
-      Row(
-        children: [
-          // type badge
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color: isFound
-                  ? const Color(0xFF052E16)
-                  : const Color(0xFF450A0A),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              isFound ? 'found' : 'lost',
-              style: TextStyle(
-                color: isFound
-                    ? const Color(0xFF4ADE80)
-                    : const Color(0xFFF87171),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // category badge
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFF083344),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              item.category,
-              style: const TextStyle(
-                color: Color(0xFF22D3EE),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
+     Row(
+  children: [
+    // type badge
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isFound
+            ? const Color(0xFF052E16)
+            : const Color(0xFF450A0A),
+        borderRadius: BorderRadius.circular(20),
       ),
+      child: Text(
+        isFound ? 'found' : 'lost',
+        style: TextStyle(
+          color: isFound
+              ? const Color(0xFF4ADE80)
+              : const Color(0xFFF87171),
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ),
+    const SizedBox(width: 8),
+    // category badge
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF083344),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        item.category,
+        style: const TextStyle(
+          color: Color(0xFF22D3EE),
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ),
+    // claimed badge
+    if (item.status == 'claimed') ...[
+      const SizedBox(width: 8),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF052E16),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          '✓ claimed',
+          style: TextStyle(
+            color: Color(0xFF4ADE80),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    ],
+  ],
+),
     ],
   ),
 ),
