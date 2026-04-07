@@ -627,16 +627,7 @@ TextField(
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-  }) {
-    return TextField(
-      controller: controller,
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDecoration(hint),
-    );
-  }
+  
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(

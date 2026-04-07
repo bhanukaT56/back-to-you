@@ -16,9 +16,7 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   String _filter = 'all';
 
-  List<ItemModel> get _filteredItems {
-    return [];
-  }
+ 
 
   @override
   Widget build(BuildContext context) {
