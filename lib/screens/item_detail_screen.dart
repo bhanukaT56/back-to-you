@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
-import '../services/auth_service.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ItemDetailScreen extends StatefulWidget {
@@ -14,7 +14,7 @@ class ItemDetailScreen extends StatefulWidget {
 
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   final FirestoreService _firestoreService = FirestoreService();
-  final AuthService _authService = AuthService();
+  
   bool _isUpdating = false;
 
   @override
