@@ -141,23 +141,60 @@ if (isFound) const SizedBox(height: 20),
                   const SizedBox(height: 20),
 
                   // description
-                  const Text(
-                    'description',
-                    style: TextStyle(
-                      color: Color(0xFFAAAAAA),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item.description,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      height: 1.6,
-                    ),
-                  ),
+                // description — hidden for found items posted by others
+if (item.type == 'lost' || isMyPost)
+  Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'description',
+        style: TextStyle(
+          color: Color(0xFFAAAAAA),
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        item.description,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          height: 1.6,
+        ),
+      ),
+    ],
+  )
+else
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1A1A1A),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFF2A2A2A)),
+    ),
+    child: const Row(
+      children: [
+        Icon(
+          Icons.lock_outline,
+          color: Color(0xFF555555),
+          size: 16,
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'description is hidden to prevent false claims. visit the security office to identify the item.',
+            style: TextStyle(
+              color: Color(0xFF555555),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
 
                   const SizedBox(height: 32),
 
