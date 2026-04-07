@@ -129,56 +129,60 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         const Divider(color: Color(0xFF2A2A2A), height: 20),
 
                         // tappable GPS location
-                        if (item.latitude != 0 && item.longitude != 0)
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pushNamed(
-                                context,
-                                '/map',
-                                arguments: {
-                                  'latitude': item.latitude,
-                                  'longitude': item.longitude,
-                                  'title': item.title,
-                                },
-                              );
-                            },
-                            child: Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'location',
-                                  style: TextStyle(
-                                    color: Color(0xFF555555),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        item.location,
-                                        style: const TextStyle(
-                                          color: Color(0xFF22D3EE),
-                                          fontSize: 13,
-                                        ),
-                                        textAlign: TextAlign.right,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Icon(
-                                      Icons.map_outlined,
-                                      color: Color(0xFF22D3EE),
-                                      size: 14,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          _buildDetailRow('location', item.location),
+                        // tappable GPS location
+if (item.latitude != 0 && item.longitude != 0)
+  GestureDetector(
+    onTap: () {
+      Navigator.pushNamed(
+        context,
+        '/map',
+        arguments: {
+          'latitude': item.latitude,
+          'longitude': item.longitude,
+          'title': item.title,
+        },
+      );
+    },
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'location',
+          style: TextStyle(
+            color: Color(0xFF555555),
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  item.location,
+                  style: const TextStyle(
+                    color: Color(0xFF22D3EE),
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.map_outlined,
+                color: Color(0xFF22D3EE),
+                size: 14,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  )
+else
+  _buildDetailRow('location', item.location),
 
                         // manual location note
                         if (item.manualLocation.isNotEmpty) ...[
