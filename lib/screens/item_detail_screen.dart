@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ItemDetailScreen extends StatefulWidget {
@@ -14,12 +12,10 @@ class ItemDetailScreen extends StatefulWidget {
 
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   final FirestoreService _firestoreService = FirestoreService();
-  
   bool _isUpdating = false;
 
   @override
   Widget build(BuildContext context) {
-    // get item passed from feed screen
     final item = ModalRoute.of(context)!.settings.arguments as ItemModel;
     final currentUser = FirebaseAuth.instance.currentUser;
     final isMyPost = currentUser?.uid == item.postedBy;
@@ -29,41 +25,41 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       backgroundColor: const Color(0xFF0F0F0F),
       body: CustomScrollView(
         slivers: [
-          // app bar with image
           SliverAppBar(
-  expandedHeight: MediaQuery.of(context).size.width,
-  pinned: true,
-  backgroundColor: const Color(0xFF0D1F26),
-  leading: IconButton(
-    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-    onPressed: () => Navigator.pop(context),
-  ),
-  flexibleSpace: FlexibleSpaceBar(
-  background: item.imageUrl.isNotEmpty
-      ? Image.network(
-          item.imageUrl,
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return Container(
-              color: const Color(0xFF0D1F26),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF22D3EE),
-                  strokeWidth: 2,
-                ),
-              ),
-            );
-          },
-        )
-      : Container(
-          color: const Color(0xFF0D1F26),
-          child: const Center(
-            child: Text('📦', style: TextStyle(fontSize: 64)),
+            expandedHeight: MediaQuery.of(context).size.width,
+            pinned: true,
+            backgroundColor: const Color(0xFF0D1F26),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: item.imageUrl.isNotEmpty
+                  ? Image.network(
+                      item.imageUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: const Color(0xFF0D1F26),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF22D3EE),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : Container(
+                      color: const Color(0xFF0D1F26),
+                      child: const Center(
+                        child: Text('📦',
+                            style: TextStyle(fontSize: 64)),
+                      ),
+                    ),
+            ),
           ),
-        ),
-),
-),
 
           SliverToBoxAdapter(
             child: Padding(
@@ -111,11 +107,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     ],
                   ),
 
-                 const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-// status tracker — only for found items
-if (isFound) _buildStatusTracker(item.status),
-if (isFound) const SizedBox(height: 20),
+                  // status tracker — only for found items
+                  if (isFound) _buildStatusTracker(item.status),
+                  if (isFound) const SizedBox(height: 20),
 
                   // details card
                   Container(
@@ -128,16 +124,72 @@ if (isFound) const SizedBox(height: 20),
                     child: Column(
                       children: [
                         _buildDetailRow('posted by', item.postedByName),
-const Divider(color: Color(0xFF2A2A2A), height: 20),
-_buildDetailRow('category', item.category),
-const Divider(color: Color(0xFF2A2A2A), height: 20),
-_buildDetailRow('location', item.location),
-if (item.manualLocation.isNotEmpty) ...[
-  const Divider(color: Color(0xFF2A2A2A), height: 20),
-  _buildDetailRow('location note', item.manualLocation),
-],
-const Divider(color: Color(0xFF2A2A2A), height: 20),
-_buildDetailRow('posted', item.timeAgo),
+                        const Divider(color: Color(0xFF2A2A2A), height: 20),
+                        _buildDetailRow('category', item.category),
+                        const Divider(color: Color(0xFF2A2A2A), height: 20),
+
+                        // tappable GPS location
+                        if (item.latitude != 0 && item.longitude != 0)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(
+                                context,
+                                '/map',
+                                arguments: {
+                                  'latitude': item.latitude,
+                                  'longitude': item.longitude,
+                                  'title': item.title,
+                                },
+                              );
+                            },
+                            child: Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'location',
+                                  style: TextStyle(
+                                    color: Color(0xFF555555),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        item.location,
+                                        style: const TextStyle(
+                                          color: Color(0xFF22D3EE),
+                                          fontSize: 13,
+                                        ),
+                                        textAlign: TextAlign.right,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.map_outlined,
+                                      color: Color(0xFF22D3EE),
+                                      size: 14,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          _buildDetailRow('location', item.location),
+
+                        // manual location note
+                        if (item.manualLocation.isNotEmpty) ...[
+                          const Divider(
+                              color: Color(0xFF2A2A2A), height: 20),
+                          _buildDetailRow(
+                              'location note', item.manualLocation),
+                        ],
+
+                        const Divider(color: Color(0xFF2A2A2A), height: 20),
+                        _buildDetailRow('posted', item.timeAgo),
                       ],
                     ),
                   ),
@@ -145,60 +197,59 @@ _buildDetailRow('posted', item.timeAgo),
                   const SizedBox(height: 20),
 
                   // description
-                // description — hidden for found items posted by others
-if (item.type == 'lost' || isMyPost)
-  Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        'description',
-        style: TextStyle(
-          color: Color(0xFFAAAAAA),
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        item.description,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          height: 1.6,
-        ),
-      ),
-    ],
-  )
-else
-  Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: const Color(0xFF1A1A1A),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFF2A2A2A)),
-    ),
-    child: const Row(
-      children: [
-        Icon(
-          Icons.lock_outline,
-          color: Color(0xFF555555),
-          size: 16,
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'description is hidden to prevent false claims. visit the security office to identify the item.',
-            style: TextStyle(
-              color: Color(0xFF555555),
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-        ),
-      ],
-    ),
-  ),
+                  if (item.type == 'lost' || isMyPost)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'description',
+                          style: TextStyle(
+                            color: Color(0xFFAAAAAA),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          item.description,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.lock_outline,
+                            color: Color(0xFF555555),
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'description is hidden to prevent false claims. visit the security office to identify the item.',
+                              style: TextStyle(
+                                color: Color(0xFF555555),
+                                fontSize: 13,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   const SizedBox(height: 32),
 
@@ -297,8 +348,7 @@ else
                   ? const Color(0xFF22D3EE)
                   : const Color(0xFF444444),
               fontSize: 10,
-              fontWeight:
-                  isCurrent ? FontWeight.w500 : FontWeight.normal,
+              fontWeight: isCurrent ? FontWeight.w500 : FontWeight.normal,
             ),
             textAlign: TextAlign.center,
           ),
@@ -345,12 +395,10 @@ else
     );
   }
 
-  // buttons for the person who posted the item
- Widget _buildMyPostActions(ItemModel item) {
+  Widget _buildMyPostActions(ItemModel item) {
     bool isFound = item.type == 'found';
 
     if (!isFound) {
-      // lost item owner
       if (item.status == 'claimed') {
         return Container(
           width: double.infinity,
@@ -374,7 +422,8 @@ else
         width: double.infinity,
         height: 52,
         child: ElevatedButton(
-          onPressed: _isUpdating ? null : () => _showGotItemBackDialog(item),
+          onPressed:
+              _isUpdating ? null : () => _showGotItemBackDialog(item),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF4ADE80),
             foregroundColor: Colors.black,
@@ -387,15 +436,12 @@ else
               : const Text(
                   'i got my item back!',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
         ),
       );
     }
 
-    // found item — finder can only mark as submitted
     if (item.status == 'found') {
       return _buildStatusButton(
         label: 'mark as submitted to security',
@@ -405,7 +451,6 @@ else
       );
     }
 
-    // submitted — waiting for admin to mark as claimed
     if (item.status == 'submitted') {
       return Container(
         width: double.infinity,
@@ -429,7 +474,6 @@ else
       );
     }
 
-    // claimed
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -449,11 +493,9 @@ else
     );
   }
 
-  // claim button for other users
- Widget _buildClaimButton(ItemModel item) {
+  Widget _buildClaimButton(ItemModel item) {
     bool isFound = item.type == 'found';
 
-    // lost item — no action for other users
     if (!isFound) {
       return Container(
         width: double.infinity,
@@ -476,7 +518,6 @@ else
       );
     }
 
-    // found item — already claimed
     if (item.status == 'claimed') {
       return Container(
         width: double.infinity,
@@ -497,7 +538,6 @@ else
       );
     }
 
-    // found item — submitted, waiting for admin
     if (item.status == 'submitted') {
       return Container(
         width: double.infinity,
@@ -520,7 +560,6 @@ else
       );
     }
 
-    // found item — still with finder
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -537,6 +576,36 @@ else
             color: Color(0xFFAAAAAA),
             fontSize: 13,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusButton({
+    required String label,
+    required Color color,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: _isUpdating ? null : onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Center(
+          child: _isUpdating
+              ? CircularProgressIndicator(color: textColor)
+              : Text(
+                  label,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
         ),
       ),
     );
@@ -578,35 +647,6 @@ else
     );
   }
 
-  Widget _buildStatusButton({
-    required String label,
-    required Color color,
-    required Color textColor,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: _isUpdating ? null : onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Center(
-          child: _isUpdating
-              ? CircularProgressIndicator(color: textColor)
-              : Text(
-                  label,
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _updateStatus(String itemId, String newStatus) async {
     setState(() => _isUpdating = true);
     String? error =
@@ -634,6 +674,4 @@ else
       }
     }
   }
-
-  
 }

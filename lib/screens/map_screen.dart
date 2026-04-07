@@ -16,10 +16,20 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   String _filter = 'all';
 
- 
-
   @override
   Widget build(BuildContext context) {
+    // check if we received a specific item to focus on
+    final args = ModalRoute.of(context)?.settings.arguments;
+    double? focusLat;
+    double? focusLng;
+    String? focusTitle;
+
+    if (args != null && args is Map<String, dynamic>) {
+      focusLat = args['latitude'];
+      focusLng = args['longitude'];
+      focusTitle = args['title'];
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
@@ -29,9 +39,9 @@ class _MapScreenState extends State<MapScreen> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'map view',
-          style: TextStyle(color: Colors.white, fontSize: 18),
+        title: Text(
+          focusTitle != null ? focusTitle : 'map view',
+          style: const TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
       body: StreamBuilder<List<ItemModel>>(
@@ -45,65 +55,62 @@ class _MapScreenState extends State<MapScreen> {
 
           final allItems = snapshot.data ?? [];
 
-          // apply filter
           final items = _filter == 'all'
               ? allItems
               : allItems.where((i) => i.type == _filter).toList();
 
           return Column(
             children: [
-              // filter tabs
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                color: const Color(0xFF0F0F0F),
-                child: Row(
-                  children: [
-                    _filterTab('all', 'all'),
-                    const SizedBox(width: 8),
-                    _filterTab('found', 'found'),
-                    const SizedBox(width: 8),
-                    _filterTab('lost', 'lost'),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        _legendDot(const Color(0xFF22D3EE)),
-                        const SizedBox(width: 4),
-                        const Text(
-                          'found',
-                          style: TextStyle(
-                            color: Color(0xFF555555),
-                            fontSize: 11,
+              // filter tabs — only show when not in focus mode
+              if (focusLat == null)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                  color: const Color(0xFF0F0F0F),
+                  child: Row(
+                    children: [
+                      _filterTab('all', 'all'),
+                      const SizedBox(width: 8),
+                      _filterTab('found', 'found'),
+                      const SizedBox(width: 8),
+                      _filterTab('lost', 'lost'),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          _legendDot(const Color(0xFF22D3EE)),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'found',
+                            style: TextStyle(
+                                color: Color(0xFF555555), fontSize: 11),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        _legendDot(const Color(0xFFF87171)),
-                        const SizedBox(width: 4),
-                        const Text(
-                          'lost',
-                          style: TextStyle(
-                            color: Color(0xFF555555),
-                            fontSize: 11,
+                          const SizedBox(width: 10),
+                          _legendDot(const Color(0xFFF87171)),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'lost',
+                            style: TextStyle(
+                                color: Color(0xFF555555), fontSize: 11),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
               // map
               Expanded(
                 child: FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: items.isNotEmpty &&
-                            items.first.latitude != 0
-                        ? LatLng(
-                            items.first.latitude,
-                            items.first.longitude,
-                          )
-                        : const LatLng(6.9271, 79.8612),
-                    initialZoom: 15,
+                    initialCenter: focusLat != null
+                        ? LatLng(focusLat, focusLng!)
+                        : items.isNotEmpty && items.first.latitude != 0
+                            ? LatLng(
+                                items.first.latitude,
+                                items.first.longitude,
+                              )
+                            : const LatLng(6.9271, 79.8612),
+                    initialZoom: focusLat != null ? 17 : 15,
                   ),
                   children: [
                     TileLayer(
@@ -112,39 +119,78 @@ class _MapScreenState extends State<MapScreen> {
                       userAgentPackageName: 'com.example.back_to_you',
                     ),
                     MarkerLayer(
-                      markers: items
-                          .where((item) =>
-                              item.latitude != 0 && item.longitude != 0)
-                          .map((item) {
-                        bool isFound = item.type == 'found';
-                        return Marker(
-                          point: LatLng(item.latitude, item.longitude),
-                          width: 40,
-                          height: 40,
-                          child: GestureDetector(
-                            onTap: () => _showItemBottomSheet(item),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isFound
-                                    ? const Color(0xFF22D3EE)
-                                    : const Color(0xFFF87171),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2,
+                      markers: [
+                        // highlighted item pin if coming from detail screen
+                        if (focusLat != null)
+                          Marker(
+                            point: LatLng(focusLat, focusLng!),
+                            width: 120,
+                            height: 60,
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF22D3EE),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    focusTitle ?? 'item',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  isFound ? Icons.check : Icons.search,
-                                  color: Colors.black,
-                                  size: 18,
+                                const Icon(
+                                  Icons.location_pin,
+                                  color: Color(0xFF22D3EE),
+                                  size: 28,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // all other items
+                        ...items
+                            .where((item) =>
+                                item.latitude != 0 && item.longitude != 0)
+                            .map((item) {
+                          bool isFound = item.type == 'found';
+                          return Marker(
+                            point: LatLng(item.latitude, item.longitude),
+                            width: 40,
+                            height: 40,
+                            child: GestureDetector(
+                              onTap: () => _showItemBottomSheet(item),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isFound
+                                      ? const Color(0xFF22D3EE)
+                                      : const Color(0xFFF87171),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    isFound ? Icons.check : Icons.search,
+                                    color: Colors.black,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ],
                     ),
                   ],
                 ),
@@ -166,7 +212,9 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${items.where((i) => i.latitude != 0).length} items on map',
+                      focusLat != null
+                          ? 'showing location for: ${focusTitle ?? 'item'}'
+                          : '${items.where((i) => i.latitude != 0).length} items on map',
                       style: const TextStyle(
                         color: Color(0xFF555555),
                         fontSize: 12,
@@ -280,17 +328,6 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.description,
-              style: const TextStyle(
-                color: Color(0xFF888888),
-                fontSize: 13,
-                height: 1.5,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
             Row(
