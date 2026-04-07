@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,7 +13,15 @@ class ItemDetailScreen extends StatefulWidget {
 
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+  final TextEditingController _commentController = TextEditingController();
   bool _isUpdating = false;
+  bool _isPostingComment = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,8 +63,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   : Container(
                       color: const Color(0xFF0D1F26),
                       child: const Center(
-                        child: Text('📦',
-                            style: TextStyle(fontSize: 64)),
+                        child: Text('📦', style: TextStyle(fontSize: 64)),
                       ),
                     ),
             ),
@@ -129,60 +137,60 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         const Divider(color: Color(0xFF2A2A2A), height: 20),
 
                         // tappable GPS location
-                        // tappable GPS location
-if (item.latitude != 0 && item.longitude != 0)
-  GestureDetector(
-    onTap: () {
-      Navigator.pushNamed(
-        context,
-        '/map',
-        arguments: {
-          'latitude': item.latitude,
-          'longitude': item.longitude,
-          'title': item.title,
-        },
-      );
-    },
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          'location',
-          style: TextStyle(
-            color: Color(0xFF555555),
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Flexible(
-                child: Text(
-                  item.location,
-                  style: const TextStyle(
-                    color: Color(0xFF22D3EE),
-                    fontSize: 13,
-                  ),
-                  textAlign: TextAlign.right,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.map_outlined,
-                color: Color(0xFF22D3EE),
-                size: 14,
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  )
-else
-  _buildDetailRow('location', item.location),
+                        if (item.latitude != 0 && item.longitude != 0)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(
+                                context,
+                                '/map',
+                                arguments: {
+                                  'latitude': item.latitude,
+                                  'longitude': item.longitude,
+                                  'title': item.title,
+                                },
+                              );
+                            },
+                            child: Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'location',
+                                  style: TextStyle(
+                                    color: Color(0xFF555555),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          item.location,
+                                          style: const TextStyle(
+                                            color: Color(0xFF22D3EE),
+                                            fontSize: 13,
+                                          ),
+                                          textAlign: TextAlign.right,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.map_outlined,
+                                        color: Color(0xFF22D3EE),
+                                        size: 14,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          _buildDetailRow('location', item.location),
 
                         // manual location note
                         if (item.manualLocation.isNotEmpty) ...[
@@ -264,6 +272,11 @@ else
                     _buildClaimButton(item),
 
                   const SizedBox(height: 32),
+
+                  // comments section
+                  _buildCommentsSection(item, currentUser),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -271,6 +284,321 @@ else
         ],
       ),
     );
+  }
+
+  Widget _buildCommentsSection(ItemModel item, User? currentUser) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'comments',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // comments list
+        StreamBuilder<QuerySnapshot>(
+          stream: _firestoreService.getComments(item.id),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF22D3EE),
+                  strokeWidth: 2,
+                ),
+              );
+            }
+
+            final comments = snapshot.data?.docs ?? [];
+
+            if (comments.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2A2A2A)),
+                ),
+                child: const Text(
+                  'no comments yet — be the first!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF555555),
+                    fontSize: 13,
+                  ),
+                ),
+              );
+            }
+
+            return ListView.builder(
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  itemCount: comments.length,
+  itemBuilder: (context, index) {
+    final comment =
+        comments[index].data() as Map<String, dynamic>;
+    final isMyComment =
+        comment['postedBy'] == currentUser?.uid;
+
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(comment['postedBy'])
+          .get(),
+      builder: (context, userSnapshot) {
+        String studentId = '';
+        if (userSnapshot.hasData && userSnapshot.data!.exists) {
+          final userData =
+              userSnapshot.data!.data() as Map<String, dynamic>;
+          studentId = userData['studentId'] ?? '';
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isMyComment
+                ? const Color(0xFF083344)
+                : const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isMyComment
+                  ? const Color(0xFF22D3EE)
+                  : const Color(0xFF2A2A2A),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // avatar
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: isMyComment
+                      ? const Color(0xFF22D3EE)
+                      : const Color(0xFF2A2A2A),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    (comment['postedByName'] ?? '?')[0].toUpperCase(),
+                    style: TextStyle(
+                      color: isMyComment
+                          ? Colors.black
+                          : const Color(0xFFAAAAAA),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isMyComment
+                              ? 'you'
+                              : comment['postedByName'] ?? 'Unknown',
+                          style: TextStyle(
+                            color: isMyComment
+                                ? const Color(0xFF22D3EE)
+                                : Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (studentId.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF083344),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'ID: $studentId',
+                              style: const TextStyle(
+                                color: Color(0xFF22D3EE),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          _getTimeAgo(comment['createdAt']),
+                          style: const TextStyle(
+                            color: Color(0xFF444444),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      comment['text'] ?? '',
+                      style: const TextStyle(
+                        color: Color(0xFFAAAAAA),
+                        fontSize: 13,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  },
+);
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        // comment input
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _commentController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: null,
+                decoration: InputDecoration(
+                  hintText: item.type == 'lost'
+                      ? 'e.g. I think I found this near the library...'
+                      : 'add a comment...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF444444),
+                    fontSize: 13,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFF1A1A1A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF2A2A2A)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF2A2A2A)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF22D3EE),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _isPostingComment
+                  ? null
+                  : () => _postComment(item.id, currentUser),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22D3EE),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _isPostingComment
+                    ? const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.black,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.send,
+                        color: Colors.black,
+                        size: 20,
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _postComment(String itemId, User? currentUser) async {
+    if (_commentController.text.trim().isEmpty) return;
+    if (currentUser == null) return;
+
+    setState(() => _isPostingComment = true);
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      final userData = doc.data();
+      String userName = userData?['name'] ?? 'Anonymous';
+
+      String? error = await _firestoreService.addComment(
+        itemId: itemId,
+        text: _commentController.text.trim(),
+        postedBy: currentUser.uid,
+        postedByName: userName,
+      );
+
+      setState(() => _isPostingComment = false);
+
+      if (error != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error),
+              backgroundColor: const Color(0xFF1A1A1A),
+            ),
+          );
+        }
+      } else {
+        _commentController.clear();
+      }
+    } catch (e) {
+      setState(() => _isPostingComment = false);
+    }
+  }
+
+  String _getTimeAgo(dynamic timestamp) {
+    if (timestamp == null) return 'just now';
+    try {
+      final DateTime date = (timestamp as Timestamp).toDate();
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      if (difference.inSeconds < 60) return 'just now';
+      if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+      if (difference.inHours < 24) return '${difference.inHours}h ago';
+      if (difference.inDays < 7) return '${difference.inDays}d ago';
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return 'just now';
+    }
   }
 
   Widget _buildStatusTracker(String status) {

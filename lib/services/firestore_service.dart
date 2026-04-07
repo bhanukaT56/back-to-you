@@ -110,6 +110,40 @@ class FirestoreService {
     }
   }
 
+  // ADD COMMENT
+Future<String?> addComment({
+  required String itemId,
+  required String text,
+  required String postedBy,
+  required String postedByName,
+}) async {
+  try {
+    await _firestore
+        .collection('items')
+        .doc(itemId)
+        .collection('comments')
+        .add({
+      'text': text,
+      'postedBy': postedBy,
+      'postedByName': postedByName,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return null;
+  } catch (e) {
+    return 'failed to add comment';
+  }
+}
+
+// GET COMMENTS — real time stream
+Stream<QuerySnapshot> getComments(String itemId) {
+  return _firestore
+      .collection('items')
+      .doc(itemId)
+      .collection('comments')
+      .orderBy('createdAt', descending: false)
+      .snapshots();
+}
+
   // GET ALL ITEMS FOR MAP
   Future<List<ItemModel>> getItemsForMap() async {
     try {
