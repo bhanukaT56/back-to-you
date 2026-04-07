@@ -452,34 +452,14 @@ void _showSnackBar(String message) {
 
         final items = snapshot.data ?? [];
 
-        final foundItems = items.where((i) => i.type == 'found').length;
-        final lostItems = items.where((i) => i.type == 'lost').length;
-        final claimedItems =
-            items.where((i) => i.status == 'claimed').length;
-
+       
         return Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // stats row
-              Row(
-                children: [
-                  _buildStatCard(
-                      '${items.length}', 'total', const Color(0xFF22D3EE)),
-                  const SizedBox(width: 10),
-                  _buildStatCard(
-                      '$foundItems', 'found', const Color(0xFF4ADE80)),
-                  const SizedBox(width: 10),
-                  _buildStatCard(
-                      '$lostItems', 'lost', const Color(0xFFF87171)),
-                  const SizedBox(width: 10),
-                  _buildStatCard(
-                      '$claimedItems', 'claimed', const Color(0xFFF59E0B)),
-                ],
-              ),
-
-              const SizedBox(height: 24),
+           
 
               const Text(
                 'my posts',
@@ -539,38 +519,7 @@ void _showSnackBar(String message) {
     );
   }
 
-  Widget _buildStatCard(String value, String label, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2A2A2A)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF555555),
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+ 
 
   Widget _buildMyPostCard(ItemModel item) {
     bool isFound = item.type == 'found';

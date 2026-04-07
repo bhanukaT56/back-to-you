@@ -458,12 +458,24 @@ class _PostScreenState extends State<PostScreen> {
 
               const SizedBox(height: 20),
 
-              _buildLabel('item name'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _titleController,
-                hint: 'e.g. Blue Nike Backpack',
-              ),
+           _buildLabel('item name'),
+const SizedBox(height: 4),
+const Text(
+  'max 15 characters',
+  style: TextStyle(
+    color: Color(0xFF444444),
+    fontSize: 11,
+  ),
+),
+const SizedBox(height: 8),
+TextField(
+  controller: _titleController,
+  maxLength: 15,
+  style: const TextStyle(color: Colors.white),
+  decoration: _inputDecoration('e.g. Blue Laptop').copyWith(
+    counterStyle: const TextStyle(color: Color(0xFF555555)),
+  ),
+),
 
               const SizedBox(height: 16),
 
@@ -615,16 +627,7 @@ class _PostScreenState extends State<PostScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-  }) {
-    return TextField(
-      controller: controller,
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDecoration(hint),
-    );
-  }
+  
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(

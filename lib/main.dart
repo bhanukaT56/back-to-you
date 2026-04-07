@@ -10,6 +10,7 @@ import 'screens/post_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/item_detail_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/admin_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
+       '/admin': (context) => const AdminScreen(),
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),

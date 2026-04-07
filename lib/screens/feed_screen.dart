@@ -13,6 +13,7 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   String _filter = 'all';
+  String _dateFilter = 'all time';
   int _currentIndex = 0;
   String _userName = '';
   String? _profilePhoto;
@@ -25,13 +26,38 @@ class _FeedScreenState extends State<FeedScreen> {
     _loadUserData();
   }
 
- Future<void> _loadUserData() async {
+  Future<void> _loadUserData() async {
     final data = await _authService.getUserData();
     if (data != null && mounted) {
       setState(() {
         _userName = data['name']?.split(' ')?.first ?? 'there';
         _profilePhoto = data['profilePhotoUrl'];
       });
+    }
+  }
+
+  List<ItemModel> _applyDateFilter(List<ItemModel> items) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final weekAgo = today.subtract(const Duration(days: 7));
+    final monthAgo = today.subtract(const Duration(days: 30));
+
+    switch (_dateFilter) {
+      case 'today':
+        return items.where((i) => i.createdAt.isAfter(today)).toList();
+      case 'yesterday':
+        return items
+            .where((i) =>
+                i.createdAt.isAfter(yesterday) &&
+                i.createdAt.isBefore(today))
+            .toList();
+      case 'this week':
+        return items.where((i) => i.createdAt.isAfter(weekAgo)).toList();
+      case 'this month':
+        return items.where((i) => i.createdAt.isAfter(monthAgo)).toList();
+      default:
+        return items;
     }
   }
 
@@ -44,6 +70,7 @@ class _FeedScreenState extends State<FeedScreen> {
           children: [
             _buildHeader(),
             _buildFilterTabs(),
+            _buildDateFilterTabs(),
             Expanded(
               child: _buildFeed(),
             ),
@@ -111,14 +138,14 @@ class _FeedScreenState extends State<FeedScreen> {
                   width: 1.5,
                 ),
               ),
-             child: _profilePhoto != null
-    ? ClipOval(
-        child: Image.network(
-          _profilePhoto!,
-          fit: BoxFit.cover,
-          width: 44,
-          height: 44,
-        ),
+              child: _profilePhoto != null
+                  ? ClipOval(
+                      child: Image.network(
+                        _profilePhoto!,
+                        fit: BoxFit.cover,
+                        width: 44,
+                        height: 44,
+                      ),
                     )
                   : Center(
                       child: Text(
@@ -141,7 +168,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Widget _buildFilterTabs() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       color: const Color(0xFF0F0F0F),
       child: Row(
         children: [
@@ -151,6 +178,51 @@ class _FeedScreenState extends State<FeedScreen> {
           const SizedBox(width: 8),
           _filterTab('lost', 'lost'),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDateFilterTabs() {
+    final dateFilters = ['all time', 'today', 'yesterday', 'this week', 'this month'];
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.only(left: 16, bottom: 8),
+      color: const Color(0xFF0F0F0F),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: dateFilters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = dateFilters[index];
+          bool isSelected = _dateFilter == filter;
+          return GestureDetector(
+            onTap: () => setState(() => _dateFilter = filter),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF083344)
+                    : const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF22D3EE)
+                      : const Color(0xFF2A2A2A),
+                ),
+              ),
+              child: Text(
+                filter,
+                style: TextStyle(
+                  color: isSelected
+                      ? const Color(0xFF22D3EE)
+                      : const Color(0xFF555555),
+                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -205,10 +277,13 @@ class _FeedScreenState extends State<FeedScreen> {
 
         final allItems = snapshot.data ?? [];
 
-        // filter locally instead of re-querying Firestore
-        final items = _filter == 'all'
+        // apply type filter
+        var items = _filter == 'all'
             ? allItems
             : allItems.where((i) => i.type == _filter).toList();
+
+        // apply date filter
+        items = _applyDateFilter(items);
 
         if (items.isEmpty) {
           return Center(
@@ -227,7 +302,9 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'be the first to make a post!',
+                  _dateFilter != 'all time'
+                      ? 'no posts for $_dateFilter'
+                      : 'be the first to make a post!',
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
@@ -315,111 +392,108 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
 
-         if (item.imageUrl.isNotEmpty)
-  AspectRatio(
-    aspectRatio: 1.0,
-    child: ClipRRect(
-      borderRadius: BorderRadius.zero,
-      child: Image.network(
-        item.imageUrl,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return Container(
-            color: const Color(0xFF0D1F26),
-            child: const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF22D3EE),
-                strokeWidth: 2,
+            if (item.imageUrl.isNotEmpty)
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.zero,
+                  child: Image.network(
+                    item.imageUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        color: const Color(0xFF0D1F26),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF22D3EE),
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              )
+            else
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: Container(
+                  color: const Color(0xFF0D1F26),
+                  child: const Center(
+                    child: Text('📦', style: TextStyle(fontSize: 48)),
+                  ),
+                ),
               ),
-            ),
-          );
-        },
-      ),
-    ),
-  )
-else
-  AspectRatio(
-    aspectRatio: 1.0,
-    child: Container(
-      color: const Color(0xFF0D1F26),
-      child: const Center(
-        child: Text('📦', style: TextStyle(fontSize: 48)),
-      ),
-    ),
-  ),
 
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.description,
-                    style: const TextStyle(
-                      color: Color(0xFF666666),
-                      fontSize: 13,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isFound
-                              ? const Color(0xFF052E16)
-                              : const Color(0xFF450A0A),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          isFound ? 'found' : 'lost',
-                          style: TextStyle(
-                            color: isFound
-                                ? const Color(0xFF4ADE80)
-                                : const Color(0xFFF87171),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.location_on_outlined,
-                        color: Color(0xFF444444),
-                        size: 13,
-                      ),
-                      const SizedBox(width: 2),
-                      Expanded(
-                        child: Text(
-                          item.location,
-                          style: const TextStyle(
-                            color: Color(0xFF444444),
-                            fontSize: 12,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            // item details
+Padding(
+  padding: const EdgeInsets.all(12),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // item name
+      Text(
+        item.title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 8),
+      // type and category
+      Row(
+        children: [
+          // type badge
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: isFound
+                  ? const Color(0xFF052E16)
+                  : const Color(0xFF450A0A),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              isFound ? 'found' : 'lost',
+              style: TextStyle(
+                color: isFound
+                    ? const Color(0xFF4ADE80)
+                    : const Color(0xFFF87171),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
             ),
+          ),
+          const SizedBox(width: 8),
+          // category badge
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFF083344),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              item.category,
+              style: const TextStyle(
+                color: Color(0xFF22D3EE),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  ),
+),
           ],
         ),
       ),
