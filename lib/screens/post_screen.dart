@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:convert';
+
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -32,7 +32,6 @@ class _PostScreenState extends State<PostScreen> {
   String _type = 'found';
   String _category = 'Electronics';
   String _location = '';
-  String _manualLocation = '';
   double _latitude = 0.0;
   double _longitude = 0.0;
   LatLng _selectedMapLocation = const LatLng(6.9271, 79.8612);
@@ -213,8 +212,8 @@ class _PostScreenState extends State<PostScreen> {
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      final File? image =
-                          await _imageService.pickItemPhoto(ImageSource.camera);
+                      final File? image = await _imageService
+                          .pickItemPhoto(ImageSource.camera);
                       if (image != null) setState(() => _itemImage = image);
                     },
                     child: Container(
@@ -433,7 +432,8 @@ class _PostScreenState extends State<PostScreen> {
                               SizedBox(height: 4),
                               Text('camera or gallery',
                                   style: TextStyle(
-                                      color: Color(0xFF555555), fontSize: 12)),
+                                      color: Color(0xFF555555),
+                                      fontSize: 12)),
                             ],
                           ),
                   ),
@@ -455,8 +455,7 @@ class _PostScreenState extends State<PostScreen> {
                 maxLength: 15,
                 style: const TextStyle(color: Colors.white),
                 decoration: _inputDecoration('e.g. Blue Laptop').copyWith(
-                  counterStyle:
-                      const TextStyle(color: Color(0xFF555555)),
+                  counterStyle: const TextStyle(color: Color(0xFF555555)),
                 ),
               ),
 
@@ -496,8 +495,7 @@ class _PostScreenState extends State<PostScreen> {
                           value: cat, child: Text(cat));
                     }).toList(),
                     onChanged: (value) {
-                      if (value != null)
-                        setState(() => _category = value);
+                      if (value != null) setState(() => _category = value);
                     },
                   ),
                 ),
@@ -532,7 +530,8 @@ class _PostScreenState extends State<PostScreen> {
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
-                                    color: Color(0xFF22D3EE), strokeWidth: 2),
+                                    color: Color(0xFF22D3EE),
+                                    strokeWidth: 2),
                               )
                             : Icon(
                                 Icons.my_location,
@@ -564,8 +563,7 @@ class _PostScreenState extends State<PostScreen> {
                 const SizedBox(height: 6),
                 const Text(
                   'GPS location is mandatory for found items',
-                  style:
-                      TextStyle(color: Color(0xFF444444), fontSize: 11),
+                  style: TextStyle(color: Color(0xFF444444), fontSize: 11),
                 ),
                 const SizedBox(height: 12),
 
@@ -575,23 +573,19 @@ class _PostScreenState extends State<PostScreen> {
                 TextField(
                   controller: _manualLocationController,
                   style: const TextStyle(color: Colors.white),
-                  onChanged: (val) =>
-                      setState(() => _manualLocation = val),
                   decoration: _inputDecoration(
                       'e.g. near the library entrance, 2nd floor'),
                 ),
                 const SizedBox(height: 6),
                 const Text(
                   'add extra location details to help identify the spot',
-                  style:
-                      TextStyle(color: Color(0xFF444444), fontSize: 11),
+                  style: TextStyle(color: Color(0xFF444444), fontSize: 11),
                 ),
               ] else ...[
                 // LOST ITEM — map picker + manual type
                 const Text(
                   'tap on the map to pin where you last saw it',
-                  style:
-                      TextStyle(color: Color(0xFF555555), fontSize: 12),
+                  style: TextStyle(color: Color(0xFF555555), fontSize: 12),
                 ),
                 const SizedBox(height: 8),
 
@@ -615,7 +609,6 @@ class _PostScreenState extends State<PostScreen> {
                         initialCenter: _selectedMapLocation,
                         initialZoom: 15,
                         onTap: (tapPosition, point) async {
-                          // get address from tapped coordinates
                           List<Placemark> placemarks =
                               await placemarkFromCoordinates(
                                   point.latitude, point.longitude);
@@ -690,14 +683,13 @@ class _PostScreenState extends State<PostScreen> {
                   style: const TextStyle(color: Colors.white),
                   onChanged: (val) {
                     setState(() {
-                      _manualLocation = val;
                       if (val.isNotEmpty && !_mapLocationSelected) {
                         _location = val;
                       }
                     });
                   },
-                  decoration:
-                      _inputDecoration('e.g. Library, Block B, 2nd floor'),
+                  decoration: _inputDecoration(
+                      'e.g. Library, Block B, 2nd floor'),
                 ),
               ],
 
@@ -778,7 +770,6 @@ class _PostScreenState extends State<PostScreen> {
       return;
     }
 
-    // location validation
     if (_type == 'found' && _location.isEmpty) {
       _showSnackBar('GPS location is mandatory for found items');
       return;
@@ -790,7 +781,6 @@ class _PostScreenState extends State<PostScreen> {
       return;
     }
 
-    // for lost item with only manual location
     if (_type == 'lost' && _location.isEmpty) {
       setState(() {
         _location = _manualLocationController.text.trim();
