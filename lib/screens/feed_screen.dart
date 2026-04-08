@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -122,44 +124,113 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () async {
-              await Navigator.pushNamed(context, '/profile');
-              _loadUserData();
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF083344),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF22D3EE),
-                  width: 1.5,
+          Row(
+            children: [
+              // notification bell
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('notifications')
+                    .where('userId',
+                        isEqualTo:
+                            FirebaseAuth.instance.currentUser?.uid)
+                    .where('isRead', isEqualTo: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data?.docs.length ?? 0;
+                  return GestureDetector(
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/notifications'),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF083344),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: unreadCount > 0
+                                  ? const Color(0xFF22D3EE)
+                                  : const Color(0xFF2A2A2A),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.notifications_outlined,
+                            color: Color(0xFF22D3EE),
+                            size: 20,
+                          ),
+                        ),
+                        if (unreadCount > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF87171),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              // profile avatar
+              GestureDetector(
+                onTap: () async {
+                  await Navigator.pushNamed(context, '/profile');
+                  _loadUserData();
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF083344),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF22D3EE),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: _profilePhoto != null
+                      ? ClipOval(
+                          child: Image.network(
+                            _profilePhoto!,
+                            fit: BoxFit.cover,
+                            width: 44,
+                            height: 44,
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            _userName.isNotEmpty
+                                ? _userName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: Color(0xFF22D3EE),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
                 ),
               ),
-              child: _profilePhoto != null
-                  ? ClipOval(
-                      child: Image.network(
-                        _profilePhoto!,
-                        fit: BoxFit.cover,
-                        width: 44,
-                        height: 44,
-                      ),
-                    )
-                  : Center(
-                      child: Text(
-                        _userName.isNotEmpty
-                            ? _userName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Color(0xFF22D3EE),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-            ),
+            ],
           ),
         ],
       ),

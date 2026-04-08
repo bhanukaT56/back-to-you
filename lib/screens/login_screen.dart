@@ -316,10 +316,13 @@ if (role == 'admin') {
   bool isVerified = await authService.isUserVerified();
   if (!mounted) return;
   if (isVerified) {
-    Navigator.pushReplacementNamed(context, '/feed');
-  } else {
-    Navigator.pushReplacementNamed(context, '/pending');
-  }
+  // save FCM token after verified login
+  await authService.saveFcmToken();
+  if (!mounted) return;
+  Navigator.pushReplacementNamed(context, '/feed');
+} else {
+  Navigator.pushReplacementNamed(context, '/pending');
+}
 }
   }
 }
