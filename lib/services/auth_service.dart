@@ -84,14 +84,15 @@ Future<void> saveFcmToken() async {
       String idPhotoUrl = await storageRef.getDownloadURL();
 
       // step 3 — save user data to Firestore
-      await _firestore.collection('users').doc(uid).set({
-        'name': name,
-        'email': email,
-        'studentId': studentId,
-        'idPhotoUrl': idPhotoUrl,
-        'isVerified': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+await _firestore.collection('users').doc(uid).set({
+  'name': name,
+  'email': email,
+  'studentId': studentId,
+  'idPhotoUrl': idPhotoUrl,
+  'isVerified': false,
+  'role': 'student',
+  'createdAt': FieldValue.serverTimestamp(),
+});
 
       return null;
 
