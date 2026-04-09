@@ -75,7 +75,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // title and badge
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -117,11 +116,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                   const SizedBox(height: 16),
 
-                  // status tracker — only for found items
                   if (isFound) _buildStatusTracker(item.status),
                   if (isFound) const SizedBox(height: 20),
 
-                  // details card
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -136,7 +133,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         _buildDetailRow('category', item.category),
                         const Divider(color: Color(0xFF2A2A2A), height: 20),
 
-                        // tappable GPS location
                         if (item.latitude != 0 && item.longitude != 0)
                           GestureDetector(
                             onTap: () {
@@ -164,7 +160,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.end,
                                     children: [
                                       Flexible(
                                         child: Text(
@@ -192,7 +189,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         else
                           _buildDetailRow('location', item.location),
 
-                        // manual location note
                         if (item.manualLocation.isNotEmpty) ...[
                           const Divider(
                               color: Color(0xFF2A2A2A), height: 20),
@@ -208,7 +204,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                   const SizedBox(height: 20),
 
-                  // description
                   if (item.type == 'lost' || isMyPost)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,7 +260,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                   const SizedBox(height: 32),
 
-                  // action buttons
                   if (isMyPost)
                     _buildMyPostActions(item)
                   else
@@ -273,7 +267,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                   const SizedBox(height: 32),
 
-                  // comments section
                   _buildCommentsSection(item, currentUser),
 
                   const SizedBox(height: 32),
@@ -290,17 +283,46 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'comments',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        // UPDATED: comment count badge added
+        Row(
+          children: [
+            const Text(
+              'comments',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Spacer(),
+            StreamBuilder<QuerySnapshot>(
+              stream: _firestoreService.getComments(item.id),
+              builder: (context, snapshot) {
+                final count = snapshot.data?.docs.length ?? 0;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF083344),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$count ${count == 1 ? 'comment' : 'comments'}',
+                    style: const TextStyle(
+                      color: Color(0xFF22D3EE),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         const SizedBox(height: 12),
 
-        // comments list
         StreamBuilder<QuerySnapshot>(
           stream: _firestoreService.getComments(item.id),
           builder: (context, snapshot) {
@@ -336,142 +358,144 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             }
 
             return ListView.builder(
-  shrinkWrap: true,
-  physics: const NeverScrollableScrollPhysics(),
-  itemCount: comments.length,
-  itemBuilder: (context, index) {
-    final comment =
-        comments[index].data() as Map<String, dynamic>;
-    final isMyComment =
-        comment['postedBy'] == currentUser?.uid;
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: comments.length,
+              itemBuilder: (context, index) {
+                final comment =
+                    comments[index].data() as Map<String, dynamic>;
+                final isMyComment =
+                    comment['postedBy'] == currentUser?.uid;
 
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('users')
-          .doc(comment['postedBy'])
-          .get(),
-      builder: (context, userSnapshot) {
-        String studentId = '';
-        if (userSnapshot.hasData && userSnapshot.data!.exists) {
-          final userData =
-              userSnapshot.data!.data() as Map<String, dynamic>;
-          studentId = userData['studentId'] ?? '';
-        }
+                return FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(comment['postedBy'])
+                      .get(),
+                  builder: (context, userSnapshot) {
+                    String studentId = '';
+                    if (userSnapshot.hasData &&
+                        userSnapshot.data!.exists) {
+                      final userData = userSnapshot.data!.data()
+                          as Map<String, dynamic>;
+                      studentId = userData['studentId'] ?? '';
+                    }
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isMyComment
-                ? const Color(0xFF083344)
-                : const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isMyComment
-                  ? const Color(0xFF22D3EE)
-                  : const Color(0xFF2A2A2A),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // avatar
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: isMyComment
-                      ? const Color(0xFF22D3EE)
-                      : const Color(0xFF2A2A2A),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    (comment['postedByName'] ?? '?')[0].toUpperCase(),
-                    style: TextStyle(
-                      color: isMyComment
-                          ? Colors.black
-                          : const Color(0xFFAAAAAA),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          isMyComment
-                              ? 'you'
-                              : comment['postedByName'] ?? 'Unknown',
-                          style: TextStyle(
-                            color: isMyComment
-                                ? const Color(0xFF22D3EE)
-                                : Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isMyComment
+                            ? const Color(0xFF083344)
+                            : const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isMyComment
+                              ? const Color(0xFF22D3EE)
+                              : const Color(0xFF2A2A2A),
                         ),
-                        if (studentId.isNotEmpty) ...[
-                          const SizedBox(width: 6),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
+                            width: 30,
+                            height: 30,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF083344),
-                              borderRadius: BorderRadius.circular(6),
+                              color: isMyComment
+                                  ? const Color(0xFF22D3EE)
+                                  : const Color(0xFF2A2A2A),
+                              shape: BoxShape.circle,
                             ),
-                            child: Text(
-                              'ID: $studentId',
-                              style: const TextStyle(
-                                color: Color(0xFF22D3EE),
-                                fontSize: 10,
+                            child: Center(
+                              child: Text(
+                                (comment['postedByName'] ?? '?')[0]
+                                    .toUpperCase(),
+                                style: TextStyle(
+                                  color: isMyComment
+                                      ? Colors.black
+                                      : const Color(0xFFAAAAAA),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          _getTimeAgo(comment['createdAt']),
-                          style: const TextStyle(
-                            color: Color(0xFF444444),
-                            fontSize: 11,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      isMyComment
+                                          ? 'you'
+                                          : comment['postedByName'] ??
+                                              'Unknown',
+                                      style: TextStyle(
+                                        color: isMyComment
+                                            ? const Color(0xFF22D3EE)
+                                            : Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (studentId.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF083344),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'ID: $studentId',
+                                          style: const TextStyle(
+                                            color: Color(0xFF22D3EE),
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const Spacer(),
+                                    Text(
+                                      _getTimeAgo(comment['createdAt']),
+                                      style: const TextStyle(
+                                        color: Color(0xFF444444),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  comment['text'] ?? '',
+                                  style: const TextStyle(
+                                    color: Color(0xFFAAAAAA),
+                                    fontSize: 13,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      comment['text'] ?? '',
-                      style: const TextStyle(
-                        color: Color(0xFFAAAAAA),
-                        fontSize: 13,
-                        height: 1.5,
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  },
-);
+                    );
+                  },
+                );
+              },
+            );
           },
         ),
 
         const SizedBox(height: 12),
 
-        // comment input
         Row(
           children: [
             Expanded(
@@ -667,7 +691,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       '${step + 1}',
                       style: const TextStyle(
                         color: Color(0xFF444444),
-                        fontSize: 11,|
+                        fontSize: 11,
                       ),
                     ),
             ),
