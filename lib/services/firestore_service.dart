@@ -1,23 +1,34 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 import '../models/item_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // GET ALL ITEMS — returns a real time stream
-  // like a websocket in React — updates automatically!
+  // UPLOAD ITEM IMAGE TO STORAGE
+  Future<String?> uploadItemImage(File image, String itemId) async {
+    try {
+      String uid = _auth.currentUser?.uid ?? 'unknown';
+      String fileName = 'item_photos/$uid/$itemId.jpg';
+      Reference storageRef = _storage.ref().child(fileName);
+      await storageRef.putFile(image);
+      String url = await storageRef.getDownloadURL();
+      return url;
+    } catch (e) {
+      print('🔴 upload error: $e');
+      return null;
+    }
+  }
+
+  // GET ALL ITEMS — real time stream
   Stream<List<ItemModel>> getItems({String filter = 'all'}) {
     Query query = _firestore
         .collection('items')
         .orderBy('createdAt', descending: true);
-
-    if (filter == 'found') {
-      query = query.where('type', isEqualTo: 'found');
-    } else if (filter == 'lost') {
-      query = query.where('type', isEqualTo: 'lost');
-    }
 
     return query.snapshots().map((snapshot) {
       return snapshot.docs
@@ -34,21 +45,41 @@ class FirestoreService {
     return _firestore
         .collection('items')
         .where('postedBy', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final items = snapshot.docs
           .map((doc) => ItemModel.fromFirestore(doc))
           .toList();
+      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return items;
     });
   }
 
   // ADD ITEM
-  Future<String?> addItem(ItemModel item) async {
+  Future<String?> addItem(ItemModel item, File imageFile) async {
     try {
-      await _firestore.collection('items').add(item.toMap());
-      return null; // success
+      print('💾 saving to firestore...');
+
+      // first create the document to get an ID
+      DocumentReference docRef =
+          await _firestore.collection('items').add(item.toMap());
+
+      // upload image to Storage using the document ID
+      String? imageUrl = await uploadItemImage(imageFile, docRef.id);
+
+      if (imageUrl == null) {
+        // delete the document if image upload failed
+        await docRef.delete();
+        return 'failed to upload image';
+      }
+
+      // update document with image URL
+      await docRef.update({'imageUrl': imageUrl});
+
+      print('💾 saved successfully!');
+      return null;
     } catch (e) {
+      print('🔴 firestore error: $e');
       return 'failed to post item. please try again';
     }
   }
@@ -78,6 +109,40 @@ class FirestoreService {
       return null;
     }
   }
+
+  // ADD COMMENT
+Future<String?> addComment({
+  required String itemId,
+  required String text,
+  required String postedBy,
+  required String postedByName,
+}) async {
+  try {
+    await _firestore
+        .collection('items')
+        .doc(itemId)
+        .collection('comments')
+        .add({
+      'text': text,
+      'postedBy': postedBy,
+      'postedByName': postedByName,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return null;
+  } catch (e) {
+    return 'failed to add comment';
+  }
+}
+
+// GET COMMENTS — real time stream
+Stream<QuerySnapshot> getComments(String itemId) {
+  return _firestore
+      .collection('items')
+      .doc(itemId)
+      .collection('comments')
+      .orderBy('createdAt', descending: false)
+      .snapshots();
+}
 
   // GET ALL ITEMS FOR MAP
   Future<List<ItemModel>> getItemsForMap() async {

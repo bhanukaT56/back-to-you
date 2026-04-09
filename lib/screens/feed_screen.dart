@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -13,23 +15,51 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   String _filter = 'all';
+  String _dateFilter = 'all time';
   int _currentIndex = 0;
   String _userName = '';
+  String? _profilePhoto;
   final FirestoreService _firestoreService = FirestoreService();
   final AuthService _authService = AuthService();
 
   @override
   void initState() {
     super.initState();
-    _loadUserName();
+    _loadUserData();
   }
 
-  Future<void> _loadUserName() async {
+  Future<void> _loadUserData() async {
     final data = await _authService.getUserData();
     if (data != null && mounted) {
       setState(() {
         _userName = data['name']?.split(' ')?.first ?? 'there';
+        _profilePhoto = data['profilePhotoUrl'];
       });
+    }
+  }
+
+  List<ItemModel> _applyDateFilter(List<ItemModel> items) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final weekAgo = today.subtract(const Duration(days: 7));
+    final monthAgo = today.subtract(const Duration(days: 30));
+
+    switch (_dateFilter) {
+      case 'today':
+        return items.where((i) => i.createdAt.isAfter(today)).toList();
+      case 'yesterday':
+        return items
+            .where((i) =>
+                i.createdAt.isAfter(yesterday) &&
+                i.createdAt.isBefore(today))
+            .toList();
+      case 'this week':
+        return items.where((i) => i.createdAt.isAfter(weekAgo)).toList();
+      case 'this month':
+        return items.where((i) => i.createdAt.isAfter(monthAgo)).toList();
+      default:
+        return items;
     }
   }
 
@@ -42,6 +72,7 @@ class _FeedScreenState extends State<FeedScreen> {
           children: [
             _buildHeader(),
             _buildFilterTabs(),
+            _buildDateFilterTabs(),
             Expanded(
               child: _buildFeed(),
             ),
@@ -93,32 +124,113 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {
-              Navigator.pushNamed(context, '/profile');
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF083344),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF22D3EE),
-                  width: 1.5,
-                ),
+          Row(
+            children: [
+              // notification bell
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('notifications')
+                    .where('userId',
+                        isEqualTo:
+                            FirebaseAuth.instance.currentUser?.uid)
+                    .where('isRead', isEqualTo: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data?.docs.length ?? 0;
+                  return GestureDetector(
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/notifications'),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF083344),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: unreadCount > 0
+                                  ? const Color(0xFF22D3EE)
+                                  : const Color(0xFF2A2A2A),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.notifications_outlined,
+                            color: Color(0xFF22D3EE),
+                            size: 20,
+                          ),
+                        ),
+                        if (unreadCount > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF87171),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
-              child: Center(
-                child: Text(
-                  _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: Color(0xFF22D3EE),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+              const SizedBox(width: 8),
+              // profile avatar
+              GestureDetector(
+                onTap: () async {
+                  await Navigator.pushNamed(context, '/profile');
+                  _loadUserData();
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF083344),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF22D3EE),
+                      width: 1.5,
+                    ),
                   ),
+                  child: _profilePhoto != null
+                      ? ClipOval(
+                          child: Image.network(
+                            _profilePhoto!,
+                            fit: BoxFit.cover,
+                            width: 44,
+                            height: 44,
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            _userName.isNotEmpty
+                                ? _userName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: Color(0xFF22D3EE),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -127,7 +239,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Widget _buildFilterTabs() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       color: const Color(0xFF0F0F0F),
       child: Row(
         children: [
@@ -141,6 +253,51 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
+  Widget _buildDateFilterTabs() {
+    final dateFilters = ['all time', 'today', 'yesterday', 'this week', 'this month'];
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.only(left: 16, bottom: 8),
+      color: const Color(0xFF0F0F0F),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: dateFilters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = dateFilters[index];
+          bool isSelected = _dateFilter == filter;
+          return GestureDetector(
+            onTap: () => setState(() => _dateFilter = filter),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF083344)
+                    : const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF22D3EE)
+                      : const Color(0xFF2A2A2A),
+                ),
+              ),
+              child: Text(
+                filter,
+                style: TextStyle(
+                  color: isSelected
+                      ? const Color(0xFF22D3EE)
+                      : const Color(0xFF555555),
+                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _filterTab(String value, String label) {
     bool isSelected = _filter == value;
     return GestureDetector(
@@ -148,7 +305,9 @@ class _FeedScreenState extends State<FeedScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF22D3EE) : const Color(0xFF1A1A1A),
+          color: isSelected
+              ? const Color(0xFF22D3EE)
+              : const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
@@ -170,7 +329,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Widget _buildFeed() {
     return StreamBuilder<List<ItemModel>>(
-      stream: _firestoreService.getItems(filter: _filter),
+      stream: _firestoreService.getItems(filter: 'all'),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -187,7 +346,15 @@ class _FeedScreenState extends State<FeedScreen> {
           );
         }
 
-        final items = snapshot.data ?? [];
+        final allItems = snapshot.data ?? [];
+
+        // apply type filter
+        var items = _filter == 'all'
+            ? allItems
+            : allItems.where((i) => i.type == _filter).toList();
+
+        // apply date filter
+        items = _applyDateFilter(items);
 
         if (items.isEmpty) {
           return Center(
@@ -206,7 +373,9 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'be the first to make a post!',
+                  _dateFilter != 'all time'
+                      ? 'no posts for $_dateFilter'
+                      : 'be the first to make a post!',
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
@@ -246,7 +415,6 @@ class _FeedScreenState extends State<FeedScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // card header - user info
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: Row(
@@ -295,98 +463,121 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
 
-            // item image
-            if (item.imageBase64.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.zero,
-                child: Image.memory(
-                  base64Decode(item.imageBase64),
-                  width: double.infinity,
-                  height: 180,
-                  fit: BoxFit.cover,
+            if (item.imageUrl.isNotEmpty)
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.zero,
+                  child: Image.network(
+                    item.imageUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        color: const Color(0xFF0D1F26),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF22D3EE),
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               )
             else
-              Container(
-                width: double.infinity,
-                height: 180,
-                color: const Color(0xFF0D1F26),
-                child: const Center(
-                  child: Text('📦', style: TextStyle(fontSize: 48)),
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: Container(
+                  color: const Color(0xFF0D1F26),
+                  child: const Center(
+                    child: Text('📦', style: TextStyle(fontSize: 48)),
+                  ),
                 ),
               ),
 
             // item details
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.description,
-                    style: const TextStyle(
-                      color: Color(0xFF666666),
-                      fontSize: 13,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isFound
-                              ? const Color(0xFF052E16)
-                              : const Color(0xFF450A0A),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          isFound ? 'found' : 'lost',
-                          style: TextStyle(
-                            color: isFound
-                                ? const Color(0xFF4ADE80)
-                                : const Color(0xFFF87171),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.location_on_outlined,
-                        color: Color(0xFF444444),
-                        size: 13,
-                      ),
-                      const SizedBox(width: 2),
-                      Expanded(
-                        child: Text(
-                          item.location,
-                          style: const TextStyle(
-                            color: Color(0xFF444444),
-                            fontSize: 12,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+Padding(
+  padding: const EdgeInsets.all(12),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // item name
+      Text(
+        item.title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 8),
+      // type and category
+     Row(
+  children: [
+    // type badge
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isFound
+            ? const Color(0xFF052E16)
+            : const Color(0xFF450A0A),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        isFound ? 'found' : 'lost',
+        style: TextStyle(
+          color: isFound
+              ? const Color(0xFF4ADE80)
+              : const Color(0xFFF87171),
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ),
+    const SizedBox(width: 8),
+    // category badge
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF083344),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        item.category,
+        style: const TextStyle(
+          color: Color(0xFF22D3EE),
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ),
+    // claimed badge
+    if (item.status == 'claimed') ...[
+      const SizedBox(width: 8),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF052E16),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          '✓ claimed',
+          style: TextStyle(
+            color: Color(0xFF4ADE80),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    ],
+  ],
+),
+    ],
+  ),
+),
           ],
         ),
       ),

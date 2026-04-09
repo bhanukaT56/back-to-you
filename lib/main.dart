@@ -10,13 +10,28 @@ import 'screens/post_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/item_detail_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/admin_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'screens/notification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // handle background messages
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   runApp(const MyApp());
+}
+
+// must be top-level function
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  print('Background message: ${message.messageId}');
 }
 
 class MyApp extends StatelessWidget {
@@ -36,6 +51,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
+       '/admin': (context) => const AdminScreen(),
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
@@ -45,6 +61,7 @@ class MyApp extends StatelessWidget {
         '/map': (context) => const MapScreen(),
         '/item-detail': (context) => const ItemDetailScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/notifications': (context) => const NotificationScreen(),
       },
     );
   }

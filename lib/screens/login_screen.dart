@@ -302,15 +302,27 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    bool isVerified = await authService.isUserVerified();
-    setState(() => _isLoading = false);
+    // check role first
+String role = await authService.getUserRole();
+setState(() => _isLoading = false);
 
-    if (!mounted) return;
+if (!mounted) return;
 
-    if (isVerified) {
-      Navigator.pushReplacementNamed(context, '/feed');
-    } else {
-      Navigator.pushReplacementNamed(context, '/pending');
-    }
+if (role == 'admin') {
+  // admin goes to admin dashboard
+  Navigator.pushReplacementNamed(context, '/admin');
+} else {
+  // student checks verification
+  bool isVerified = await authService.isUserVerified();
+  if (!mounted) return;
+  if (isVerified) {
+  // save FCM token after verified login
+  await authService.saveFcmToken();
+  if (!mounted) return;
+  Navigator.pushReplacementNamed(context, '/feed');
+} else {
+  Navigator.pushReplacementNamed(context, '/pending');
+}
+}
   }
 }

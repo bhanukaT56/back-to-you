@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/item_model.dart';
 import '../services/firestore_service.dart';
-import '../services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ItemDetailScreen extends StatefulWidget {
@@ -14,12 +13,18 @@ class ItemDetailScreen extends StatefulWidget {
 
 class _ItemDetailScreenState extends State<ItemDetailScreen> {
   final FirestoreService _firestoreService = FirestoreService();
-  final AuthService _authService = AuthService();
+  final TextEditingController _commentController = TextEditingController();
   bool _isUpdating = false;
+  bool _isPostingComment = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // get item passed from feed screen
     final item = ModalRoute.of(context)!.settings.arguments as ItemModel;
     final currentUser = FirebaseAuth.instance.currentUser;
     final isMyPost = currentUser?.uid == item.postedBy;
@@ -29,9 +34,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       backgroundColor: const Color(0xFF0F0F0F),
       body: CustomScrollView(
         slivers: [
-          // app bar with image
           SliverAppBar(
-            expandedHeight: 280,
+            expandedHeight: MediaQuery.of(context).size.width,
             pinned: true,
             backgroundColor: const Color(0xFF0D1F26),
             leading: IconButton(
@@ -39,10 +43,22 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: item.imageBase64.isNotEmpty
-                  ? Image.memory(
-                      base64Decode(item.imageBase64),
+              background: item.imageUrl.isNotEmpty
+                  ? Image.network(
+                      item.imageUrl,
                       fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: const Color(0xFF0D1F26),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF22D3EE),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        );
+                      },
                     )
                   : Container(
                       color: const Color(0xFF0D1F26),
@@ -101,10 +117,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                   const SizedBox(height: 16),
 
-                  // status tracker
-                  _buildStatusTracker(item.status),
-
-                  const SizedBox(height: 20),
+                  // status tracker — only for found items
+                  if (isFound) _buildStatusTracker(item.status),
+                  if (isFound) const SizedBox(height: 20),
 
                   // details card
                   Container(
@@ -120,7 +135,71 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         const Divider(color: Color(0xFF2A2A2A), height: 20),
                         _buildDetailRow('category', item.category),
                         const Divider(color: Color(0xFF2A2A2A), height: 20),
-                        _buildDetailRow('location', item.location),
+
+                        // tappable GPS location
+                        if (item.latitude != 0 && item.longitude != 0)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(
+                                context,
+                                '/map',
+                                arguments: {
+                                  'latitude': item.latitude,
+                                  'longitude': item.longitude,
+                                  'title': item.title,
+                                },
+                              );
+                            },
+                            child: Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'location',
+                                  style: TextStyle(
+                                    color: Color(0xFF555555),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          item.location,
+                                          style: const TextStyle(
+                                            color: Color(0xFF22D3EE),
+                                            fontSize: 13,
+                                          ),
+                                          textAlign: TextAlign.right,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.map_outlined,
+                                        color: Color(0xFF22D3EE),
+                                        size: 14,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          _buildDetailRow('location', item.location),
+
+                        // manual location note
+                        if (item.manualLocation.isNotEmpty) ...[
+                          const Divider(
+                              color: Color(0xFF2A2A2A), height: 20),
+                          _buildDetailRow(
+                              'location note', item.manualLocation),
+                        ],
+
                         const Divider(color: Color(0xFF2A2A2A), height: 20),
                         _buildDetailRow('posted', item.timeAgo),
                       ],
@@ -130,23 +209,59 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   const SizedBox(height: 20),
 
                   // description
-                  const Text(
-                    'description',
-                    style: TextStyle(
-                      color: Color(0xFFAAAAAA),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                  if (item.type == 'lost' || isMyPost)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'description',
+                          style: TextStyle(
+                            color: Color(0xFFAAAAAA),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          item.description,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.lock_outline,
+                            color: Color(0xFF555555),
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'description is hidden to prevent false claims. visit the security office to identify the item.',
+                              style: TextStyle(
+                                color: Color(0xFF555555),
+                                fontSize: 13,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item.description,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      height: 1.6,
-                    ),
-                  ),
 
                   const SizedBox(height: 32),
 
@@ -157,6 +272,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     _buildClaimButton(item),
 
                   const SizedBox(height: 32),
+
+                  // comments section
+                  _buildCommentsSection(item, currentUser),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -164,6 +284,321 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildCommentsSection(ItemModel item, User? currentUser) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'comments',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // comments list
+        StreamBuilder<QuerySnapshot>(
+          stream: _firestoreService.getComments(item.id),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF22D3EE),
+                  strokeWidth: 2,
+                ),
+              );
+            }
+
+            final comments = snapshot.data?.docs ?? [];
+
+            if (comments.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2A2A2A)),
+                ),
+                child: const Text(
+                  'no comments yet — be the first!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF555555),
+                    fontSize: 13,
+                  ),
+                ),
+              );
+            }
+
+            return ListView.builder(
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  itemCount: comments.length,
+  itemBuilder: (context, index) {
+    final comment =
+        comments[index].data() as Map<String, dynamic>;
+    final isMyComment =
+        comment['postedBy'] == currentUser?.uid;
+
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(comment['postedBy'])
+          .get(),
+      builder: (context, userSnapshot) {
+        String studentId = '';
+        if (userSnapshot.hasData && userSnapshot.data!.exists) {
+          final userData =
+              userSnapshot.data!.data() as Map<String, dynamic>;
+          studentId = userData['studentId'] ?? '';
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isMyComment
+                ? const Color(0xFF083344)
+                : const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isMyComment
+                  ? const Color(0xFF22D3EE)
+                  : const Color(0xFF2A2A2A),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // avatar
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: isMyComment
+                      ? const Color(0xFF22D3EE)
+                      : const Color(0xFF2A2A2A),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    (comment['postedByName'] ?? '?')[0].toUpperCase(),
+                    style: TextStyle(
+                      color: isMyComment
+                          ? Colors.black
+                          : const Color(0xFFAAAAAA),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isMyComment
+                              ? 'you'
+                              : comment['postedByName'] ?? 'Unknown',
+                          style: TextStyle(
+                            color: isMyComment
+                                ? const Color(0xFF22D3EE)
+                                : Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (studentId.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF083344),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'ID: $studentId',
+                              style: const TextStyle(
+                                color: Color(0xFF22D3EE),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          _getTimeAgo(comment['createdAt']),
+                          style: const TextStyle(
+                            color: Color(0xFF444444),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      comment['text'] ?? '',
+                      style: const TextStyle(
+                        color: Color(0xFFAAAAAA),
+                        fontSize: 13,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  },
+);
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        // comment input
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _commentController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: null,
+                decoration: InputDecoration(
+                  hintText: item.type == 'lost'
+                      ? 'e.g. I think I found this near the library...'
+                      : 'add a comment...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF444444),
+                    fontSize: 13,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFF1A1A1A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF2A2A2A)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF2A2A2A)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF22D3EE),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _isPostingComment
+                  ? null
+                  : () => _postComment(item.id, currentUser),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22D3EE),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _isPostingComment
+                    ? const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.black,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.send,
+                        color: Colors.black,
+                        size: 20,
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _postComment(String itemId, User? currentUser) async {
+    if (_commentController.text.trim().isEmpty) return;
+    if (currentUser == null) return;
+
+    setState(() => _isPostingComment = true);
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      final userData = doc.data();
+      String userName = userData?['name'] ?? 'Anonymous';
+
+      String? error = await _firestoreService.addComment(
+        itemId: itemId,
+        text: _commentController.text.trim(),
+        postedBy: currentUser.uid,
+        postedByName: userName,
+      );
+
+      setState(() => _isPostingComment = false);
+
+      if (error != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error),
+              backgroundColor: const Color(0xFF1A1A1A),
+            ),
+          );
+        }
+      } else {
+        _commentController.clear();
+      }
+    } catch (e) {
+      setState(() => _isPostingComment = false);
+    }
+  }
+
+  String _getTimeAgo(dynamic timestamp) {
+    if (timestamp == null) return 'just now';
+    try {
+      final DateTime date = (timestamp as Timestamp).toDate();
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      if (difference.inSeconds < 60) return 'just now';
+      if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+      if (difference.inHours < 24) return '${difference.inHours}h ago';
+      if (difference.inDays < 7) return '${difference.inDays}d ago';
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return 'just now';
+    }
   }
 
   Widget _buildStatusTracker(String status) {
@@ -245,8 +680,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   ? const Color(0xFF22D3EE)
                   : const Color(0xFF444444),
               fontSize: 10,
-              fontWeight:
-                  isCurrent ? FontWeight.w500 : FontWeight.normal,
+              fontWeight: isCurrent ? FontWeight.w500 : FontWeight.normal,
             ),
             textAlign: TextAlign.center,
           ),
@@ -293,67 +727,129 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     );
   }
 
-  // buttons for the person who posted the item
   Widget _buildMyPostActions(ItemModel item) {
-    return Column(
-      children: [
-        const Text(
-          'update item status',
+    bool isFound = item.type == 'found';
+
+    if (!isFound) {
+      if (item.status == 'claimed') {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF052E16),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Center(
+            child: Text(
+              '✓ you got your item back!',
+              style: TextStyle(
+                color: Color(0xFF4ADE80),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        );
+      }
+      return SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton(
+          onPressed:
+              _isUpdating ? null : () => _showGotItemBackDialog(item),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4ADE80),
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: _isUpdating
+              ? const CircularProgressIndicator(color: Colors.black)
+              : const Text(
+                  'i got my item back!',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+        ),
+      );
+    }
+
+    if (item.status == 'found') {
+      return _buildStatusButton(
+        label: 'mark as submitted to security',
+        color: const Color(0xFF22D3EE),
+        textColor: Colors.black,
+        onTap: () => _updateStatus(item.id, 'submitted'),
+      );
+    }
+
+    if (item.status == 'submitted') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF083344),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF22D3EE)),
+        ),
+        child: const Center(
+          child: Text(
+            '⏳ submitted to security — waiting for claim',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF22D3EE),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF052E16),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Center(
+        child: Text(
+          '✓ item has been claimed',
           style: TextStyle(
-            color: Color(0xFFAAAAAA),
-            fontSize: 13,
+            color: Color(0xFF4ADE80),
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            if (item.status == 'found')
-              Expanded(
-                child: _buildStatusButton(
-                  label: 'mark as submitted',
-                  color: const Color(0xFF22D3EE),
-                  textColor: Colors.black,
-                  onTap: () => _updateStatus(item.id, 'submitted'),
-                ),
-              ),
-            if (item.status == 'submitted') ...[
-              Expanded(
-                child: _buildStatusButton(
-                  label: 'mark as claimed',
-                  color: const Color(0xFF4ADE80),
-                  textColor: Colors.black,
-                  onTap: () => _updateStatus(item.id, 'claimed'),
-                ),
-              ),
-            ],
-            if (item.status == 'claimed')
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF052E16),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '✓ item has been claimed',
-                      style: TextStyle(
-                        color: Color(0xFF4ADE80),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 
-  // claim button for other users
   Widget _buildClaimButton(ItemModel item) {
+    bool isFound = item.type == 'found';
+
+    if (!isFound) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+        ),
+        child: const Center(
+          child: Text(
+            'if you found this item please submit it to the security office',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFAAAAAA),
+              fontSize: 13,
+            ),
+          ),
+        ),
+      );
+    }
+
     if (item.status == 'claimed') {
       return Container(
         width: double.infinity,
@@ -374,7 +870,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       );
     }
 
-    if (item.type == 'lost') {
+    if (item.status == 'submitted') {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
@@ -385,7 +881,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         ),
         child: const Center(
           child: Text(
-            'contact security office to report finding this item',
+            'item is at the security office — visit to claim it',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFFAAAAAA),
@@ -396,27 +892,23 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       );
     }
 
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: _isUpdating ? null : () => _showClaimDialog(item),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22D3EE),
-          foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF2A2A2A)),
+      ),
+      child: const Center(
+        child: Text(
+          'contact the security office if this is your item',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFFAAAAAA),
+            fontSize: 13,
           ),
         ),
-        child: _isUpdating
-            ? const CircularProgressIndicator(color: Colors.black)
-            : const Text(
-                'this is mine — claim it',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
       ),
     );
   }
@@ -430,6 +922,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     return GestureDetector(
       onTap: _isUpdating ? null : onTap,
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: color,
@@ -446,6 +939,42 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   ),
                 ),
         ),
+      ),
+    );
+  }
+
+  void _showGotItemBackDialog(ItemModel item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'got your item back?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'mark this item as returned so others know it has been recovered!',
+          style: TextStyle(color: Color(0xFF888888), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'cancel',
+              style: TextStyle(color: Color(0xFF555555)),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateStatus(item.id, 'claimed');
+            },
+            child: const Text(
+              'yes, i got it back!',
+              style: TextStyle(color: Color(0xFF4ADE80)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -476,41 +1005,5 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         Navigator.pop(context);
       }
     }
-  }
-
-  void _showClaimDialog(ItemModel item) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          'claim this item?',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'please go to the security office with your student ID to collect this item.',
-          style: TextStyle(color: Color(0xFF888888), height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'cancel',
-              style: TextStyle(color: Color(0xFF555555)),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _updateStatus(item.id, 'claimed');
-            },
-            child: const Text(
-              'yes, claim it',
-              style: TextStyle(color: Color(0xFF22D3EE)),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
