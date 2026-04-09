@@ -126,7 +126,6 @@ class _FeedScreenState extends State<FeedScreen> {
           ),
           Row(
             children: [
-              // notification bell
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('notifications')
@@ -190,7 +189,6 @@ class _FeedScreenState extends State<FeedScreen> {
                 },
               ),
               const SizedBox(width: 8),
-              // profile avatar
               GestureDetector(
                 onTap: () async {
                   await Navigator.pushNamed(context, '/profile');
@@ -254,7 +252,13 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Widget _buildDateFilterTabs() {
-    final dateFilters = ['all time', 'today', 'yesterday', 'this week', 'this month'];
+    final dateFilters = [
+      'all time',
+      'today',
+      'yesterday',
+      'this week',
+      'this month'
+    ];
     return Container(
       height: 36,
       padding: const EdgeInsets.only(left: 16, bottom: 8),
@@ -269,7 +273,8 @@ class _FeedScreenState extends State<FeedScreen> {
           return GestureDetector(
             onTap: () => setState(() => _dateFilter = filter),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFF083344)
@@ -287,7 +292,8 @@ class _FeedScreenState extends State<FeedScreen> {
                   color: isSelected
                       ? const Color(0xFF22D3EE)
                       : const Color(0xFF555555),
-                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                  fontWeight:
+                      isSelected ? FontWeight.w500 : FontWeight.normal,
                   fontSize: 12,
                 ),
               ),
@@ -348,12 +354,10 @@ class _FeedScreenState extends State<FeedScreen> {
 
         final allItems = snapshot.data ?? [];
 
-        // apply type filter
         var items = _filter == 'all'
             ? allItems
             : allItems.where((i) => i.type == _filter).toList();
 
-        // apply date filter
         items = _applyDateFilter(items);
 
         if (items.isEmpty) {
@@ -372,10 +376,12 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                // UPDATED: improved empty state message
                 Text(
                   _dateFilter != 'all time'
-                      ? 'no posts for $_dateFilter'
-                      : 'be the first to make a post!',
+                      ? 'no posts found for $_dateFilter.\ntry a different date filter!'
+                      : 'no posts yet.\nbe the first to make a post!',
+                  textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
@@ -498,86 +504,83 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
 
-            // item details
-Padding(
-  padding: const EdgeInsets.all(12),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // item name
-      Text(
-        item.title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      const SizedBox(height: 8),
-      // type and category
-     Row(
-  children: [
-    // type badge
-    Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isFound
-            ? const Color(0xFF052E16)
-            : const Color(0xFF450A0A),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        isFound ? 'found' : 'lost',
-        style: TextStyle(
-          color: isFound
-              ? const Color(0xFF4ADE80)
-              : const Color(0xFFF87171),
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    ),
-    const SizedBox(width: 8),
-    // category badge
-    Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF083344),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        item.category,
-        style: const TextStyle(
-          color: Color(0xFF22D3EE),
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    ),
-    // claimed badge
-    if (item.status == 'claimed') ...[
-      const SizedBox(width: 8),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFF052E16),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Text(
-          '✓ claimed',
-          style: TextStyle(
-            color: Color(0xFF4ADE80),
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    ],
-  ],
-),
-    ],
-  ),
-),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isFound
+                              ? const Color(0xFF052E16)
+                              : const Color(0xFF450A0A),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          isFound ? 'found' : 'lost',
+                          style: TextStyle(
+                            color: isFound
+                                ? const Color(0xFF4ADE80)
+                                : const Color(0xFFF87171),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF083344),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          item.category,
+                          style: const TextStyle(
+                            color: Color(0xFF22D3EE),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (item.status == 'claimed') ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF052E16),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            '✓ claimed',
+                            style: TextStyle(
+                              color: Color(0xFF4ADE80),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
