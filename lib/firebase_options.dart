@@ -78,4 +78,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'back-to-you-584e7.firebasestorage.app',
     iosBundleId: 'com.example.backToYou',
   );
+
 }

@@ -232,7 +232,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       '${step + 1}',
                       style: const TextStyle(
                         color: Color(0xFF444444),
-                        fontSize: 11,
+                        fontSize: 11,|
                       ),
                     ),
             ),
